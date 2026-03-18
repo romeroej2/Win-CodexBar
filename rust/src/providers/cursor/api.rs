@@ -126,10 +126,7 @@ impl CursorApi {
             if let Some(plan) = &individual.plan {
                 // Get raw values (in cents)
                 let used_cents = plan.used.unwrap_or(0) as f64;
-                let limit_cents = plan.breakdown.as_ref()
-                    .and_then(|b| b.total)
-                    .or(plan.limit)
-                    .unwrap_or(0) as f64;
+                let limit_cents = plan.limit.unwrap_or(0) as f64;
 
                 let percent = if limit_cents > 0.0 {
                     (used_cents / limit_cents) * 100.0

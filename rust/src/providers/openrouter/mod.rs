@@ -12,7 +12,7 @@ use crate::core::{
 };
 
 /// OpenRouter API base URL
-const OPENROUTER_API_BASE: &str = "https://openrouter.ai/api/v1/auth";
+const OPENROUTER_API_BASE: &str = "https://openrouter.ai/api/v1";
 
 /// Windows Credential Manager target for OpenRouter API token
 const OPENROUTER_CREDENTIAL_TARGET: &str = "codexbar-openrouter";

@@ -148,15 +148,19 @@ impl WarpProvider {
         match keyring::Entry::new(WARP_CREDENTIAL_TARGET, "api_token") {
             Ok(entry) => match entry.get_password() {
                 Ok(token) => Ok(token),
-                Err(_) => std::env::var("WARP_API_KEY").map_err(|_| {
+                Err(_) => std::env::var("WARP_API_KEY")
+                    .or_else(|_| std::env::var("WARP_TOKEN"))
+                    .map_err(|_| {
                     ProviderError::NotInstalled(
-                        "Warp API key not found. Set in Preferences → Providers or WARP_API_KEY environment variable.".to_string(),
+                        "Warp API key not found. Set in Preferences → Providers, WARP_API_KEY, or WARP_TOKEN environment variable.".to_string(),
                     )
                 }),
             },
-            Err(_) => std::env::var("WARP_API_KEY").map_err(|_| {
+            Err(_) => std::env::var("WARP_API_KEY")
+                .or_else(|_| std::env::var("WARP_TOKEN"))
+                .map_err(|_| {
                 ProviderError::NotInstalled(
-                    "Warp API key not found. Set in Preferences → Providers or WARP_API_KEY environment variable.".to_string(),
+                    "Warp API key not found. Set in Preferences → Providers, WARP_API_KEY, or WARP_TOKEN environment variable.".to_string(),
                 )
             }),
         }

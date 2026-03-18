@@ -265,6 +265,7 @@ pub fn provider_icon(name: &str) -> &'static str {
         "antigravity" => "◉",
         "factory" | "droid" => "◎",
         "zai" | "z.ai" => "Z",
+        "kilo" => "⬢",
         "kiro" => "K",
         "vertexai" | "vertex ai" => "△",
         "augment" => "A",
@@ -294,6 +295,7 @@ pub fn provider_color(name: &str) -> Color32 {
         "factory" | "droid" => Color32::from_rgb(255, 107, 53), // #FF6B35 - Orange
         "kimi" => Color32::from_rgb(254, 96, 60),           // #FE603C - Coral
         "kimik2" | "kimi k2" => Color32::from_rgb(76, 0, 255), // #4C00FF - Electric blue
+        "kilo" => Color32::from_rgb(242, 112, 39),           // #F27027 - Kilo orange
         "kiro" => Color32::from_rgb(255, 153, 0),           // #FF9900 - Amber
         "opencode" => Color32::from_rgb(59, 130, 246),      // #3B82F6 - Blue
         "minimax" => Color32::from_rgb(254, 96, 60),        // #FE603C - Coral (same as Kimi)

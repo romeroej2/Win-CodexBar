@@ -6,7 +6,7 @@ A Windows port of [CodexBar](https://github.com/steipete/CodexBar) - the tiny me
 
 ## Features
 
-- **15 AI Providers**: Codex, Claude, Cursor, Gemini, Copilot, Antigravity, Windsurf, Zai, Kiro, Vertex AI, Augment, MiniMax, OpenCode, Kimi, Kimi K2
+- **22 AI Providers**: Codex, Claude, Cursor, Gemini, Copilot, Antigravity, Windsurf, Zai, MiniMax, Kilo, Kiro, Vertex AI, Augment, OpenCode, Kimi, Kimi K2, Amp, Warp, Ollama, OpenRouter, Synthetic, JetBrains
 - **System Tray Icon**: Dynamic two-bar meter showing session + weekly usage
 - **Native Windows UI**: Built with egui - no web runtime required
 - **Browser Cookie Extraction**: Automatic extraction from Chrome, Edge, Brave, Firefox (DPAPI encrypted)
@@ -98,13 +98,20 @@ codexbar cost -p claude
 | Antigravity | Local Language Server | Usage |
 | Windsurf | Local Config | Usage |
 | Zai | API Token | Quota |
+| MiniMax | API | Usage |
+| Kilo | API Key / CLI (`kilo login`) | Credits, Kilo Pass |
 | Kiro | CLI | Monthly Credits |
 | Vertex AI | gcloud OAuth | Cost Tracking |
 | Augment | Browser Cookies | Credits |
-| MiniMax | API | Usage |
 | OpenCode | Local Config | Usage |
 | Kimi | Browser Cookies | 5-Hour Rate, Weekly |
 | Kimi K2 | API Key | Credits |
+| Amp | API Token | Usage |
+| Warp | API Key | Credits, Add-ons |
+| Ollama | Browser Cookies | Usage |
+| OpenRouter | API Key | Credits, Key Quota |
+| Synthetic | API Key | Usage |
+| JetBrains | API Token | Usage |
 
 ## First Run
 

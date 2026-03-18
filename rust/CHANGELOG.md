@@ -10,13 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- (Next features go here)
+- **Kilo Provider**: Full Kilo credits + Kilo Pass usage tracking via tRPC batch API. Supports KILO_API_KEY env var, Windows Credential Manager, and ~/.local/share/kilo/auth.json (from `kilo login`). Includes credit blocks, pass subscription, auto-top-up display, and plan tier labels.
+- **Overview Tab**: Merged-menu Overview mode showing compact multi-provider usage rows. Select up to 3 providers in Settings → Display → Overview Tab. Remembers last-selected state across sessions.
+- **Overview Provider Settings**: Preferences UI for selecting which providers appear in the Overview tab with provider-icon checkboxes and cap enforcement.
 
 ### Changed
-- (Changes go here)
+- Provider count increased from 21 to 22 (added Kilo)
+- Warp provider now checks WARP_TOKEN as fallback when WARP_API_KEY is not set (matches upstream)
 
 ### Fixed
-- (Bug fixes go here)
+- **Cursor usage limit**: Use `plan.limit` instead of `breakdown.total` for usage cap calculation (upstream fix #240). Prevents incorrect limit interpretation.
+- **OpenRouter API URL**: Corrected base URL from `/api/v1/auth` to `/api/v1` — credits and key endpoints were hitting wrong paths.
 
 ---
 

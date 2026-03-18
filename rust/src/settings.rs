@@ -198,6 +198,14 @@ pub struct Settings {
     /// Install pending updates when quitting the application
     #[serde(default)]
     pub install_updates_on_quit: bool,
+
+    /// Overview tab: selected provider CLI names (up to 3)
+    #[serde(default)]
+    pub overview_providers: Vec<String>,
+
+    /// Whether the Overview tab was last selected in merged mode
+    #[serde(default)]
+    pub overview_last_selected: bool,
 }
 
 fn default_true() -> bool {
@@ -239,6 +247,8 @@ impl Default for Settings {
             global_shortcut: default_global_shortcut(), // Ctrl+Shift+U by default
             auto_download_updates: true, // Auto-download updates by default
             install_updates_on_quit: false, // Don't auto-install on quit by default
+            overview_providers: Vec::new(),
+            overview_last_selected: false,
         }
     }
 }
@@ -403,6 +413,45 @@ impl Settings {
     /// Set the metric preference for a provider
     pub fn set_provider_metric(&mut self, id: ProviderId, metric: MetricPreference) {
         self.provider_metrics.insert(id.cli_name().to_string(), metric);
+    }
+
+    /// Maximum number of providers shown in the Overview tab
+    pub const MAX_OVERVIEW_PROVIDERS: usize = 3;
+
+    /// Get the resolved Overview provider list, capped to MAX_OVERVIEW_PROVIDERS
+    /// and filtered to only currently-enabled providers. Falls back to first N enabled.
+    pub fn resolved_overview_providers(&self) -> Vec<ProviderId> {
+        let enabled = self.get_enabled_provider_ids();
+        if enabled.is_empty() {
+            return Vec::new();
+        }
+
+        let mut resolved: Vec<ProviderId> = self.overview_providers.iter()
+            .filter_map(|name| ProviderId::from_cli_name(name))
+            .filter(|id| enabled.contains(id))
+            .take(Self::MAX_OVERVIEW_PROVIDERS)
+            .collect();
+
+        if resolved.is_empty() {
+            resolved = enabled.into_iter().take(Self::MAX_OVERVIEW_PROVIDERS).collect();
+        }
+
+        resolved
+    }
+
+    /// Toggle a provider's selection in the Overview tab
+    pub fn toggle_overview_provider(&mut self, id: ProviderId) {
+        let name = id.cli_name().to_string();
+        if let Some(pos) = self.overview_providers.iter().position(|n| n == &name) {
+            self.overview_providers.remove(pos);
+        } else if self.overview_providers.len() < Self::MAX_OVERVIEW_PROVIDERS {
+            self.overview_providers.push(name);
+        }
+    }
+
+    /// Check if a provider is selected for Overview
+    pub fn is_overview_provider(&self, id: ProviderId) -> bool {
+        self.overview_providers.contains(&id.cli_name().to_string())
     }
 }
 
@@ -705,6 +754,15 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             api_key_help: Some("Get your API token from z.ai Dashboard → Settings"),
             config_file_path: None,
             dashboard_url: Some("https://z.ai/dashboard"),
+        },
+        ProviderConfigInfo {
+            id: ProviderId::Kilo,
+            name: "Kilo",
+            requires_api_key: true,
+            api_key_env_var: Some("KILO_API_KEY"),
+            api_key_help: Some("Set KILO_API_KEY or run `kilo login` to create ~/.local/share/kilo/auth.json"),
+            config_file_path: Some("~/.local/share/kilo/auth.json"),
+            dashboard_url: Some("https://app.kilo.ai/account/usage"),
         },
         ProviderConfigInfo {
             id: ProviderId::Warp,

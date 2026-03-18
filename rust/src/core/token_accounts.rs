@@ -106,6 +106,7 @@ impl TokenAccountSupport {
             | ProviderId::Gemini
             | ProviderId::Antigravity
             | ProviderId::Copilot
+            | ProviderId::Kilo
             | ProviderId::Kiro
             | ProviderId::VertexAI
             | ProviderId::Kimi

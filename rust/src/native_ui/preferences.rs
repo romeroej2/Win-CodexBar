@@ -1057,6 +1057,65 @@ impl PreferencesWindow {
                 self.settings_changed = true;
             }
         });
+
+        if self.settings.merge_tray_icons {
+            ui.add_space(Spacing::SM);
+
+            section_header(ui, "Overview Tab");
+
+            settings_card(ui, |ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "Select up to {} providers for the Overview tab.",
+                        Settings::MAX_OVERVIEW_PROVIDERS
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
+                );
+
+                ui.add_space(Spacing::XS);
+
+                let enabled_ids = self.settings.get_enabled_provider_ids();
+                let current_count = self.settings.overview_providers.len();
+
+                for id in &enabled_ids {
+                    let is_selected = self.settings.is_overview_provider(*id);
+                    let at_limit = current_count >= Settings::MAX_OVERVIEW_PROVIDERS;
+                    let can_toggle = is_selected || !at_limit;
+
+                    let mut checked = is_selected;
+                    let label = id.display_name();
+                    let color = provider_color(id.cli_name());
+
+                    ui.horizontal(|ui| {
+                        ui.add_enabled_ui(can_toggle, |ui| {
+                            if ui.checkbox(&mut checked, "").changed() {
+                                self.settings.toggle_overview_provider(*id);
+                                self.settings_changed = true;
+                            }
+                        });
+                        ui.label(
+                            RichText::new(provider_icon(id.cli_name()))
+                                .size(FontSize::SM)
+                                .color(color),
+                        );
+                        ui.label(
+                            RichText::new(label)
+                                .size(FontSize::SM)
+                                .color(Theme::TEXT_PRIMARY),
+                        );
+                    });
+                }
+
+                if enabled_ids.is_empty() {
+                    ui.label(
+                        RichText::new("No enabled providers.")
+                            .size(FontSize::SM)
+                            .color(Theme::TEXT_TERTIARY),
+                    );
+                }
+            });
+        }
     }
 
     fn show_api_keys_tab(&mut self, ui: &mut egui::Ui) {

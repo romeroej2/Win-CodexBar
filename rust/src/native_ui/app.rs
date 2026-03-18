@@ -12,7 +12,7 @@ use super::charts::{
 };
 use super::preferences::PreferencesWindow;
 use super::provider_icons::ProviderIconCache;
-use super::theme::{provider_color, status_color, FontSize, Radius, Spacing, Theme};
+use super::theme::{provider_color, provider_icon, status_color, FontSize, Radius, Spacing, Theme};
 use crate::core::{
     FetchContext, OpenAIDashboardCacheStore, PersonalInfoRedactor, Provider, ProviderId,
     ProviderFetchResult, RateWindow,
@@ -372,7 +372,8 @@ fn random_surprise_delay() -> Duration {
 
 struct SharedState {
     providers: Vec<ProviderData>,
-    selected_provider_idx: usize,  // Index of selected provider in grid
+    selected_provider_idx: usize,
+    overview_selected: bool,
     last_refresh: Instant,
     is_refreshing: bool,
     loading_pattern: LoadingPattern,
@@ -428,9 +429,11 @@ impl CodexBarApp {
             .map(|&id| ProviderData::placeholder(id))
             .collect();
 
+        let overview_selected = settings.overview_last_selected && settings.merge_tray_icons;
         let state = Arc::new(Mutex::new(SharedState {
             providers: placeholders,
-            selected_provider_idx: 0,  // Select first provider by default
+            selected_provider_idx: 0,
+            overview_selected,
             last_refresh: Instant::now() - Duration::from_secs(999),
             is_refreshing: false,
             loading_pattern: LoadingPattern::random(),
@@ -890,6 +893,7 @@ fn create_provider(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::VertexAI => Box::new(VertexAIProvider::new()),
         ProviderId::Augment => Box::new(AugmentProvider::new()),
         ProviderId::MiniMax => Box::new(MiniMaxProvider::new()),
+        ProviderId::Kilo => Box::new(KiloProvider::new()),
         ProviderId::OpenCode => Box::new(OpenCodeProvider::new()),
         ProviderId::Kimi => Box::new(KimiProvider::new()),
         ProviderId::KimiK2 => Box::new(KimiK2Provider::new()),
@@ -1021,7 +1025,7 @@ impl eframe::App for CodexBarApp {
         }
 
         // Get state
-        let (providers, selected_idx, is_refreshing, loading_pattern, loading_phase, surprise_state, update_info, update_download_state, login_state) = {
+        let (providers, selected_idx, overview_active, is_refreshing, loading_pattern, loading_phase, surprise_state, update_info, update_download_state, login_state) = {
             if let Ok(mut state) = self.state.lock() {
                 if state.is_refreshing {
                     state.loading_phase += 0.05;
@@ -1067,9 +1071,9 @@ impl eframe::App for CodexBarApp {
                     state.login_message.clone(),
                 );
 
-                (state.providers.clone(), state.selected_provider_idx, state.is_refreshing, state.loading_pattern, state.loading_phase, surprise, update, update_download_state, login_state)
+                (state.providers.clone(), state.selected_provider_idx, state.overview_selected, state.is_refreshing, state.loading_pattern, state.loading_phase, surprise, update, update_download_state, login_state)
             } else {
-                (Vec::new(), 0, false, LoadingPattern::default(), 0.0, None, None, UpdateState::Idle, (None, LoginPhase::Idle, None))
+                (Vec::new(), 0, false, false, LoadingPattern::default(), 0.0, None, None, UpdateState::Idle, (None, LoginPhase::Idle, None))
             }
         };
 
@@ -1429,8 +1433,63 @@ impl eframe::App for CodexBarApp {
                                 .num_columns(columns)
                                 .spacing([0.0, 2.0])
                                 .show(ui, |ui| {
+                                    // Overview tab (first slot, when merge mode is on)
+                                    let show_overview_tab = self.settings.merge_tray_icons;
+                                    let mut grid_item_count = 0;
+
+                                    if show_overview_tab {
+                                        let is_selected = overview_active;
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            Vec2::new(cell_width, cell_height),
+                                            egui::Sense::click()
+                                        );
+
+                                        if is_selected {
+                                            ui.painter().rect_filled(
+                                                rect,
+                                                Rounding::same(Radius::SM),
+                                                Theme::ACCENT_PRIMARY,
+                                            );
+                                        } else if response.hovered() {
+                                            ui.painter().rect_filled(
+                                                rect,
+                                                Rounding::same(Radius::SM),
+                                                Theme::CARD_BG_HOVER,
+                                            );
+                                        }
+
+                                        let icon_color = if is_selected { Color32::WHITE } else { Theme::TEXT_SECONDARY };
+                                        let icon_center_y = rect.min.y + 14.0;
+                                        ui.painter().text(
+                                            egui::pos2(rect.center().x, icon_center_y),
+                                            egui::Align2::CENTER_CENTER,
+                                            "⊞",
+                                            egui::FontId::proportional(16.0),
+                                            icon_color,
+                                        );
+
+                                        let text_color = if is_selected { Color32::WHITE } else { Theme::TEXT_SECONDARY };
+                                        ui.painter().text(
+                                            egui::pos2(rect.center().x, rect.min.y + 32.0),
+                                            egui::Align2::CENTER_CENTER,
+                                            "Overview",
+                                            egui::FontId::proportional(9.0),
+                                            text_color,
+                                        );
+
+                                        if response.clicked() {
+                                            if let Ok(mut state) = self.state.lock() {
+                                                state.overview_selected = true;
+                                            }
+                                            self.settings.overview_last_selected = true;
+                                            let _ = self.settings.save();
+                                        }
+
+                                        grid_item_count += 1;
+                                    }
+
                                     for (i, (original_idx, provider)) in visible_providers.iter().enumerate() {
-                                        let is_selected = *original_idx == selected_idx;
+                                        let is_selected = !overview_active && *original_idx == selected_idx;
                                         let brand_color = provider_color(&provider.name);
 
                                         let (rect, response) = ui.allocate_exact_size(
@@ -1512,11 +1571,14 @@ impl eframe::App for CodexBarApp {
                                         if response.clicked() {
                                             if let Ok(mut state) = self.state.lock() {
                                                 state.selected_provider_idx = *original_idx;
+                                                state.overview_selected = false;
                                             }
+                                            self.settings.overview_last_selected = false;
+                                            let _ = self.settings.save();
                                         }
 
-                                        // End row after 4 columns
-                                        if (i + 1) % columns == 0 {
+                                        let total_i = grid_item_count + i;
+                                        if (total_i + 1) % columns == 0 {
                                             ui.end_row();
                                         }
                                     }
@@ -1533,14 +1595,42 @@ impl eframe::App for CodexBarApp {
                             ui.add_space(2.0);
 
                             // ════════════════════════════════════════════════════════════
-                            // SELECTED PROVIDER DETAIL CARD
+                            // SELECTED PROVIDER DETAIL CARD / OVERVIEW
                             // ════════════════════════════════════════════════════════════
                             let mut manual_refresh_requested = false;
                             let mut account_switch_provider: Option<String> = None;
                             let show_credits = self.settings.show_credits_extra_usage;
                             let show_as_used = self.settings.show_as_used;
                             let hide_personal_info = self.settings.hide_personal_info;
-                            if let Some((_, selected_provider)) = visible_providers.iter().find(|(idx, _)| *idx == selected_idx) {
+
+                            if overview_active && self.settings.merge_tray_icons {
+                                let overview_ids = self.settings.resolved_overview_providers();
+                                let overview_data: Vec<&ProviderData> = overview_ids.iter()
+                                    .filter_map(|id| {
+                                        visible_providers.iter()
+                                            .find(|(_, p)| p.name == id.cli_name())
+                                            .map(|(_, p)| p)
+                                    })
+                                    .collect();
+
+                                if overview_data.is_empty() {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(Spacing::LG);
+                                        ui.label(RichText::new("No providers selected for Overview")
+                                            .size(FontSize::SM)
+                                            .color(Theme::TEXT_TERTIARY));
+                                        ui.add_space(Spacing::SM);
+                                        ui.label(RichText::new("Configure in Settings → Display")
+                                            .size(FontSize::XS)
+                                            .color(Theme::TEXT_TERTIARY));
+                                    });
+                                } else {
+                                    for provider in &overview_data {
+                                        draw_overview_provider_row(ui, provider, &mut self.icon_cache, show_as_used);
+                                        ui.add_space(2.0);
+                                    }
+                                }
+                            } else if let Some((_, selected_provider)) = visible_providers.iter().find(|(idx, _)| *idx == selected_idx) {
                                 let (refresh, switch) = draw_provider_detail_card(
                                     ui,
                                     selected_provider,
@@ -1552,7 +1642,6 @@ impl eframe::App for CodexBarApp {
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
                             } else if let Some((_, first_provider)) = visible_providers.first() {
-                                // Fallback to first if selected isn't visible
                                 let (refresh, switch) = draw_provider_detail_card(
                                     ui,
                                     first_provider,
@@ -1698,6 +1787,87 @@ impl eframe::App for CodexBarApp {
             self.was_refreshing = is_refreshing;
         }
     }
+}
+
+/// Compact row for the Overview tab: icon, name, and usage bar
+fn draw_overview_provider_row(
+    ui: &mut egui::Ui,
+    provider: &ProviderData,
+    _icon_cache: &mut ProviderIconCache,
+    show_as_used: bool,
+) {
+    let brand_color = provider_color(&provider.name);
+
+    egui::Frame::none()
+        .fill(Theme::CARD_BG)
+        .rounding(Rounding::same(Radius::SM))
+        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+        .stroke(Stroke::new(0.5, Theme::CARD_BORDER))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let icon_char = provider_icon(&provider.name);
+                ui.label(
+                    RichText::new(icon_char)
+                        .size(FontSize::BASE)
+                        .color(brand_color),
+                );
+
+                ui.add_space(4.0);
+
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(&provider.display_name)
+                                .size(FontSize::SM)
+                                .color(Theme::TEXT_PRIMARY)
+                                .strong(),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if let Some(reset_desc) = &provider.reset_description {
+                                ui.label(
+                                    RichText::new(reset_desc)
+                                        .size(FontSize::XS)
+                                        .color(Theme::TEXT_TERTIARY),
+                                );
+                            } else if let Some(error) = &provider.error {
+                                let short = if error.len() > 30 {
+                                    format!("{}…", &error[..29])
+                                } else {
+                                    error.clone()
+                                };
+                                ui.label(
+                                    RichText::new(short)
+                                        .size(FontSize::XS)
+                                        .color(Theme::RED),
+                                );
+                            }
+                        });
+                    });
+
+                    if let Some(percent) = provider.session_percent {
+                        let display_percent = if show_as_used { percent } else { 100.0 - percent };
+                        let bar_width = ui.available_width();
+                        let bar_height = 6.0;
+                        let (bar_rect, _) = ui.allocate_exact_size(
+                            Vec2::new(bar_width, bar_height),
+                            egui::Sense::hover(),
+                        );
+
+                        ui.painter().rect_filled(
+                            bar_rect,
+                            Rounding::same(3.0),
+                            Color32::from_rgba_unmultiplied(brand_color.r(), brand_color.g(), brand_color.b(), 40),
+                        );
+
+                        let fill_width = bar_rect.width() * (display_percent as f32 / 100.0).clamp(0.0, 1.0);
+                        if fill_width > 0.0 {
+                            let fill_rect = Rect::from_min_size(bar_rect.min, Vec2::new(fill_width, bar_height));
+                            ui.painter().rect_filled(fill_rect, Rounding::same(3.0), brand_color);
+                        }
+                    }
+                });
+            });
+        });
 }
 
 /// Draw a provider detail card - macOS UsageMenuCardView style
