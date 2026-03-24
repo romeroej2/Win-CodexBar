@@ -215,17 +215,12 @@ impl PreferencesWindow {
     }
 
     pub fn close(&mut self) {
-        // Sync from shared state first
-        if let Ok(state) = self.shared_state.lock() {
-            self.settings = state.settings.clone();
-            self.settings_changed = state.settings_changed;
+        // Flush any unsaved settings through the same atomic path used per-frame.
+        if let Some(settings) = self.take_settings_if_changed() {
+            let _ = settings.save();
         }
 
-        if self.settings_changed {
-            let _ = self.settings.save();
-        }
         self.is_open = false;
-
         if let Ok(mut state) = self.shared_state.lock() {
             state.is_open = false;
         }
@@ -241,6 +236,22 @@ impl PreferencesWindow {
             }
         }
         false
+    }
+
+    /// Atomically check if settings changed and return the new settings if so.
+    /// Clears the flag in both `PreferencesWindow` and the shared viewport state
+    /// so duplicate saves cannot happen across frames.
+    pub fn take_settings_if_changed(&mut self) -> Option<Settings> {
+        if let Ok(mut state) = self.shared_state.lock() {
+            if state.settings_changed {
+                state.settings_changed = false;
+                self.settings = state.settings.clone();
+                self.settings_changed = false;
+                return Some(self.settings.clone());
+            }
+        }
+        self.settings_changed = false;
+        None
     }
 
     /// Reload the cached snapshot from disk (call after refresh completes)

@@ -1770,16 +1770,16 @@ impl eframe::App for CodexBarApp {
         let mut refresh_requested = self.preferences_window.take_refresh_requested();
         let previous_enabled_provider_ids = self.settings.get_enabled_provider_ids();
 
-        // Sync settings first, then refresh so refresh always uses current settings.
-        if self.preferences_window.settings_changed {
-            self.settings = self.preferences_window.settings.clone();
+        // Atomically consume settings changes so the flag is cleared in both
+        // PreferencesWindow and the shared viewport state in one shot.
+        if let Some(new_settings) = self.preferences_window.take_settings_if_changed() {
+            self.settings = new_settings;
             if let Err(e) = self.settings.save() {
                 tracing::error!("Failed to save settings: {}", e);
             }
             if previous_enabled_provider_ids != self.settings.get_enabled_provider_ids() {
                 refresh_requested = true;
             }
-            self.preferences_window.settings_changed = false;
         }
 
         // Check if preferences window requested a provider refresh
