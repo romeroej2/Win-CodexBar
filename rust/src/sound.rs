@@ -57,7 +57,7 @@ fn play_system_sound(sound: AlertSound) {
     use std::ffi::c_uint;
 
     #[link(name = "user32")]
-    extern "system" {
+    unsafe extern "system" {
         fn MessageBeep(uType: c_uint) -> i32;
     }
 

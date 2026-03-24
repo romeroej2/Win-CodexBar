@@ -781,7 +781,8 @@ impl CodexBarApp {
                     "ZAI_API_TOKEN",
                 ];
                 for key in OAUTH_ENV_KEYS {
-                    std::env::remove_var(key);
+                    // SAFETY: no concurrent threads are reading these env vars at this point
+                    unsafe { std::env::remove_var(key) };
                 }
 
                 let handles: Vec<_> = enabled_ids
@@ -805,7 +806,8 @@ impl CodexBarApp {
                         // through FetchContext for providers that support it.
                         if let Some(ref env_vars) = env_override {
                             for (key, value) in env_vars {
-                                std::env::set_var(key, value);
+                                // SAFETY: called sequentially before spawning provider fetch tasks
+                                unsafe { std::env::set_var(key, value) };
                             }
                         }
 
