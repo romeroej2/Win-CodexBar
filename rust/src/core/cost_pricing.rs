@@ -73,6 +73,42 @@ static CODEX_PRICING: LazyLock<HashMap<&'static str, CodexPricing>> = LazyLock::
         cache_read_input_cost_per_token: 1.75e-7,
     });
 
+    // GPT-5.4 pricing
+    m.insert("gpt-5.4", CodexPricing {
+        input_cost_per_token: 2.5e-6,
+        output_cost_per_token: 1e-5,
+        cache_read_input_cost_per_token: 6.25e-7,
+    });
+    m.insert("gpt-5.4-codex", CodexPricing {
+        input_cost_per_token: 2.5e-6,
+        output_cost_per_token: 1e-5,
+        cache_read_input_cost_per_token: 6.25e-7,
+    });
+
+    // GPT-5.4 Mini pricing
+    m.insert("gpt-5.4-mini", CodexPricing {
+        input_cost_per_token: 4e-7,
+        output_cost_per_token: 1.6e-6,
+        cache_read_input_cost_per_token: 1e-7,
+    });
+    m.insert("gpt-5.4-mini-codex", CodexPricing {
+        input_cost_per_token: 4e-7,
+        output_cost_per_token: 1.6e-6,
+        cache_read_input_cost_per_token: 1e-7,
+    });
+
+    // GPT-5.4 Nano pricing
+    m.insert("gpt-5.4-nano", CodexPricing {
+        input_cost_per_token: 1e-7,
+        output_cost_per_token: 4e-7,
+        cache_read_input_cost_per_token: 2.5e-8,
+    });
+    m.insert("gpt-5.4-nano-codex", CodexPricing {
+        input_cost_per_token: 1e-7,
+        output_cost_per_token: 4e-7,
+        cache_read_input_cost_per_token: 2.5e-8,
+    });
+
     m
 });
 
@@ -348,23 +384,40 @@ impl CostUsagePricing {
     pub fn format_model_name(model: &str) -> String {
         let lower = model.to_lowercase();
 
-        // Extract version number if present
+        // GPT models: format as "GPT-{version}[ Mini| Nano]"
+        if lower.contains("gpt-") {
+            let version = regex_lite::Regex::new(r"gpt-(\d+(?:\.\d+)?)")
+                .ok()
+                .and_then(|re| re.captures(&lower))
+                .and_then(|c| c.get(1))
+                .map(|m| m.as_str().to_string());
+
+            let suffix = if lower.contains("nano") {
+                " Nano"
+            } else if lower.contains("mini") {
+                " Mini"
+            } else {
+                ""
+            };
+
+            return match version {
+                Some(v) => format!("GPT-{}{}", v, suffix),
+                None => model.to_string(),
+            };
+        }
+
+        // Claude models: extract version and family
         let version = regex_lite::Regex::new(r"(\d+(?:\.\d+)?)")
             .ok()
             .and_then(|re| re.find(&lower))
             .map(|m| m.as_str().to_string());
 
-        // Determine model family
         let family = if lower.contains("opus") {
             "Opus"
         } else if lower.contains("sonnet") {
             "Sonnet"
         } else if lower.contains("haiku") {
             "Haiku"
-        } else if lower.contains("gpt-5") {
-            "GPT-5"
-        } else if lower.contains("gpt-4") {
-            "GPT-4"
         } else {
             return model.to_string();
         };
@@ -421,6 +474,38 @@ mod tests {
     fn test_format_model_name() {
         assert_eq!(CostUsagePricing::format_model_name("claude-3.5-sonnet"), "Sonnet 3.5");
         assert_eq!(CostUsagePricing::format_model_name("claude-opus-4"), "Opus 4");
-        assert_eq!(CostUsagePricing::format_model_name("gpt-5"), "GPT-5 5");
+        assert_eq!(CostUsagePricing::format_model_name("gpt-5"), "GPT-5");
+    }
+
+    #[test]
+    fn test_gpt54_mini_cost() {
+        let cost = CostUsagePricing::codex_cost_usd("gpt-5.4-mini", 1000, 0, 500);
+        assert!(cost.is_some());
+        // 1000 * 4e-7 + 500 * 1.6e-6 = 0.0004 + 0.0008 = 0.0012
+        assert!((cost.unwrap() - 0.0012).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_gpt54_nano_cost() {
+        let cost = CostUsagePricing::codex_cost_usd("gpt-5.4-nano", 1000, 0, 500);
+        assert!(cost.is_some());
+        // 1000 * 1e-7 + 500 * 4e-7 = 0.0001 + 0.0002 = 0.0003
+        assert!((cost.unwrap() - 0.0003).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_normalize_gpt54_codex() {
+        assert_eq!(
+            CostUsagePricing::normalize_codex_model("gpt-5.4-mini-codex"),
+            "gpt-5.4-mini"
+        );
+    }
+
+    #[test]
+    fn test_format_gpt54_mini() {
+        assert_eq!(
+            CostUsagePricing::format_model_name("gpt-5.4-mini"),
+            "GPT-5.4 Mini"
+        );
     }
 }
