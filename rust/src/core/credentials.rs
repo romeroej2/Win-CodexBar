@@ -51,25 +51,26 @@ impl Default for WindowsCredentialStore {
 #[cfg(windows)]
 impl CredentialStore for WindowsCredentialStore {
     fn get(&self, service: &str, key: &str) -> Result<String, CredentialError> {
-        let entry = keyring::Entry::new(service, key).map_err(|e| CredentialError::Storage(e.to_string()))?;
-        entry
-            .get_password()
-            .map_err(|e| match e {
-                keyring::Error::NoEntry => CredentialError::NotFound,
-                keyring::Error::Ambiguous(_) => CredentialError::Storage("Ambiguous entry".to_string()),
-                _ => CredentialError::Storage(e.to_string()),
-            })
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| CredentialError::Storage(e.to_string()))?;
+        entry.get_password().map_err(|e| match e {
+            keyring::Error::NoEntry => CredentialError::NotFound,
+            keyring::Error::Ambiguous(_) => CredentialError::Storage("Ambiguous entry".to_string()),
+            _ => CredentialError::Storage(e.to_string()),
+        })
     }
 
     fn set(&self, service: &str, key: &str, value: &str) -> Result<(), CredentialError> {
-        let entry = keyring::Entry::new(service, key).map_err(|e| CredentialError::Storage(e.to_string()))?;
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| CredentialError::Storage(e.to_string()))?;
         entry
             .set_password(value)
             .map_err(|e| CredentialError::Storage(e.to_string()))
     }
 
     fn delete(&self, service: &str, key: &str) -> Result<(), CredentialError> {
-        let entry = keyring::Entry::new(service, key).map_err(|e| CredentialError::Storage(e.to_string()))?;
+        let entry = keyring::Entry::new(service, key)
+            .map_err(|e| CredentialError::Storage(e.to_string()))?;
         entry.delete_credential().map_err(|e| match e {
             keyring::Error::NoEntry => CredentialError::NotFound,
             _ => CredentialError::Storage(e.to_string()),

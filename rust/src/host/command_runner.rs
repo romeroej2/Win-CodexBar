@@ -8,13 +8,13 @@
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 
 /// Command runner configuration
 #[derive(Debug, Clone)]
@@ -262,7 +262,9 @@ impl CommandRunner {
                     last_output_time = Instant::now();
 
                     // Check stop conditions
-                    if options.stop_on_url && (line.contains("https://") || line.contains("http://")) {
+                    if options.stop_on_url
+                        && (line.contains("https://") || line.contains("http://"))
+                    {
                         std::thread::sleep(options.settle_after_stop);
                         break;
                     }
@@ -302,9 +304,7 @@ impl CommandRunner {
         let env = self.env_additions.clone();
 
         tokio::task::spawn_blocking(move || {
-            let runner = CommandRunner {
-                env_additions: env,
-            };
+            let runner = CommandRunner { env_additions: env };
             runner.run(&binary, input.as_deref(), &options)
         })
         .await

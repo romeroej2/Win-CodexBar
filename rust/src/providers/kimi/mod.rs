@@ -8,8 +8,8 @@ use async_trait::async_trait;
 
 use crate::browser::cookies::get_cookie_header;
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 const KIMI_API_BASE: &str = "https://kimi.moonshot.cn";
@@ -88,7 +88,10 @@ impl KimiProvider {
             .header("Authorization", format!("Bearer {}", token))
             .header("Cookie", format!("kimi-auth={}", token))
             .header("Accept", "application/json")
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .send()
             .await?;
 
@@ -100,14 +103,19 @@ impl KimiProvider {
             return Err(ProviderError::Other(format!("API error: {}", status)));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
     /// Parse Kimi usage response
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Extract quota information
         // Kimi typically has: daily/weekly limits and 5-hour rate limits
 
@@ -120,7 +128,10 @@ impl KimiProvider {
             .unwrap_or(0.0);
 
         let five_hour_limit = quota
-            .and_then(|q| q.get("rate_limit_total").or_else(|| q.get("five_hour_limit")))
+            .and_then(|q| {
+                q.get("rate_limit_total")
+                    .or_else(|| q.get("five_hour_limit"))
+            })
             .and_then(|v| v.as_f64())
             .unwrap_or(100.0);
 
@@ -148,11 +159,13 @@ impl KimiProvider {
         };
 
         // Get user info
-        let nickname = json.get("nickname")
+        let nickname = json
+            .get("nickname")
             .or_else(|| json.get("name"))
             .and_then(|v| v.as_str());
 
-        let plan = json.get("vip_type")
+        let plan = json
+            .get("vip_type")
             .or_else(|| json.get("plan"))
             .and_then(|v| v.as_str())
             .unwrap_or("Kimi");
@@ -190,8 +203,7 @@ impl KimiProvider {
 
         rate_limit.window_minutes = Some(window_minutes as u32);
 
-        let mut usage = UsageSnapshot::new(primary)
-            .with_login_method(plan);
+        let mut usage = UsageSnapshot::new(primary).with_login_method(plan);
 
         // Only add rate limit as secondary if we actually have rate limit data
         if five_hour_limit > 0.0 {
@@ -230,12 +242,8 @@ impl Provider for KimiProvider {
                 let usage = self.fetch_via_web().await?;
                 Ok(ProviderFetchResult::new(usage, "web"))
             }
-            SourceMode::Cli => {
-                Err(ProviderError::UnsupportedSource(SourceMode::Cli))
-            }
-            SourceMode::OAuth => {
-                Err(ProviderError::UnsupportedSource(SourceMode::OAuth))
-            }
+            SourceMode::Cli => Err(ProviderError::UnsupportedSource(SourceMode::Cli)),
+            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
         }
     }
 

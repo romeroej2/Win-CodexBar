@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use std::os::windows::process::CommandExt;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, SourceMode,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    SourceMode,
 };
 
 pub use api::CodexApi;

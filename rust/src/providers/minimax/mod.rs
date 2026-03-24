@@ -7,14 +7,14 @@ mod local_storage;
 
 // Re-exports for local storage import
 #[allow(unused_imports)]
-pub use local_storage::{MiniMaxLocalStorageImporter, MiniMaxSession, ImportError};
+pub use local_storage::{ImportError, MiniMaxLocalStorageImporter, MiniMaxSession};
 
 use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// MiniMax API region
@@ -64,7 +64,7 @@ impl MiniMaxProvider {
         // Check environment variables first
         if let (Ok(group_id), Ok(api_key)) = (
             std::env::var("MINIMAX_GROUP_ID"),
-            std::env::var("MINIMAX_API_KEY")
+            std::env::var("MINIMAX_API_KEY"),
         ) {
             return Ok((group_id, api_key));
         }
@@ -75,17 +75,20 @@ impl MiniMaxProvider {
 
         let config_file = config_path.join("config.json");
         if config_file.exists() {
-            let content = tokio::fs::read_to_string(&config_file).await
+            let content = tokio::fs::read_to_string(&config_file)
+                .await
                 .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-            let json: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| ProviderError::Parse(e.to_string()))?;
+            let json: serde_json::Value =
+                serde_json::from_str(&content).map_err(|e| ProviderError::Parse(e.to_string()))?;
 
-            let group_id = json.get("group_id")
+            let group_id = json
+                .get("group_id")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            let api_key = json.get("api_key")
+            let api_key = json
+                .get("api_key")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
@@ -110,11 +113,15 @@ impl MiniMaxProvider {
         let (group_id, api_key) = self.read_api_key().await?;
 
         // Try global endpoint first, fall back to China mainland on 401/403
-        match self.fetch_from_region(&group_id, &api_key, MiniMaxRegion::Global).await {
+        match self
+            .fetch_from_region(&group_id, &api_key, MiniMaxRegion::Global)
+            .await
+        {
             Ok(usage) => Ok(usage),
             Err(ProviderError::AuthRequired) => {
                 // Retry with China mainland endpoint
-                self.fetch_from_region(&group_id, &api_key, MiniMaxRegion::ChinaMainland).await
+                self.fetch_from_region(&group_id, &api_key, MiniMaxRegion::ChinaMainland)
+                    .await
             }
             Err(e) => Err(e),
         }
@@ -156,33 +163,43 @@ impl MiniMaxProvider {
             )));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Parse MiniMax billing response
         let base_resp = json.get("base_resp");
         if let Some(base) = base_resp {
-            let status_code = base.get("status_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+            let status_code = base
+                .get("status_code")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(-1);
             if status_code != 0 {
                 return Err(ProviderError::Parse(
                     base.get("status_msg")
                         .and_then(|v| v.as_str())
                         .unwrap_or("Unknown error")
-                        .to_string()
+                        .to_string(),
                 ));
             }
         }
 
-        let used_credits = json.get("used_amount")
+        let used_credits = json
+            .get("used_amount")
             .or_else(|| json.get("total_amount"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let credit_limit = json.get("total_quota")
+        let credit_limit = json
+            .get("total_quota")
             .or_else(|| json.get("quota"))
             .and_then(|v| v.as_f64())
             .unwrap_or(100.0);
@@ -193,13 +210,13 @@ impl MiniMaxProvider {
             0.0
         };
 
-        let plan = json.get("plan_type")
+        let plan = json
+            .get("plan_type")
             .or_else(|| json.get("type"))
             .and_then(|v| v.as_str())
             .unwrap_or("MiniMax");
 
-        let usage = UsageSnapshot::new(RateWindow::new(used_percent))
-            .with_login_method(plan);
+        let usage = UsageSnapshot::new(RateWindow::new(used_percent)).with_login_method(plan);
 
         Ok(usage)
     }
@@ -213,8 +230,8 @@ impl MiniMaxProvider {
             .unwrap_or(false);
 
         if has_env_vars || has_config {
-            let usage = UsageSnapshot::new(RateWindow::new(0.0))
-                .with_login_method("MiniMax (configured)");
+            let usage =
+                UsageSnapshot::new(RateWindow::new(0.0)).with_login_method("MiniMax (configured)");
             Ok(usage)
         } else {
             Err(ProviderError::NotInstalled(
@@ -259,9 +276,7 @@ impl Provider for MiniMaxProvider {
                 let usage = self.probe_cli().await?;
                 Ok(ProviderFetchResult::new(usage, "cli"))
             }
-            SourceMode::OAuth => {
-                Err(ProviderError::UnsupportedSource(SourceMode::OAuth))
-            }
+            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
         }
     }
 

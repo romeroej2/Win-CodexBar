@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Amp provider (Sourcegraph)
@@ -126,20 +126,27 @@ impl AmpProvider {
             return Err(ProviderError::AuthRequired);
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Parse Sourcegraph/Amp usage response
-        let used = json.get("completionsUsed")
+        let used = json
+            .get("completionsUsed")
             .or_else(|| json.get("used"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let limit = json.get("completionsLimit")
+        let limit = json
+            .get("completionsLimit")
             .or_else(|| json.get("limit"))
             .and_then(|v| v.as_f64())
             .unwrap_or(500.0);
@@ -150,19 +157,20 @@ impl AmpProvider {
             0.0
         };
 
-        let plan = json.get("plan")
+        let plan = json
+            .get("plan")
             .or_else(|| json.get("tier"))
             .and_then(|v| v.as_str())
             .unwrap_or("Pro");
 
-        let reset_time = json.get("resetAt")
+        let reset_time = json
+            .get("resetAt")
             .or_else(|| json.get("periodEnd"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
         let primary_window = RateWindow::with_details(used_percent, None, None, reset_time);
-        let usage = UsageSnapshot::new(primary_window)
-            .with_login_method(plan);
+        let usage = UsageSnapshot::new(primary_window).with_login_method(plan);
 
         Ok(usage)
     }
@@ -172,8 +180,8 @@ impl AmpProvider {
         // Check ctx.api_key first
         let has_api_key = ctx.api_key.as_ref().map(|k| !k.is_empty()).unwrap_or(false);
 
-        let has_env = std::env::var("SRC_ACCESS_TOKEN").is_ok()
-            || std::env::var("AMP_ACCESS_TOKEN").is_ok();
+        let has_env =
+            std::env::var("SRC_ACCESS_TOKEN").is_ok() || std::env::var("AMP_ACCESS_TOKEN").is_ok();
 
         let has_amp_config = Self::get_amp_config_path()
             .map(|p| p.join("config.json").exists())
@@ -184,12 +192,13 @@ impl AmpProvider {
             .unwrap_or(false);
 
         if has_api_key || has_env || has_amp_config || has_cody_config {
-            let usage = UsageSnapshot::new(RateWindow::new(0.0))
-                .with_login_method("Amp (configured)");
+            let usage =
+                UsageSnapshot::new(RateWindow::new(0.0)).with_login_method("Amp (configured)");
             Ok(usage)
         } else {
             Err(ProviderError::NotInstalled(
-                "Amp not configured. Set SRC_ACCESS_TOKEN environment variable or configure Amp.".to_string()
+                "Amp not configured. Set SRC_ACCESS_TOKEN environment variable or configure Amp."
+                    .to_string(),
             ))
         }
     }
@@ -230,9 +239,7 @@ impl Provider for AmpProvider {
                 let usage = self.probe_cli(ctx).await?;
                 Ok(ProviderFetchResult::new(usage, "cli"))
             }
-            SourceMode::OAuth => {
-                Err(ProviderError::UnsupportedSource(SourceMode::OAuth))
-            }
+            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
         }
     }
 

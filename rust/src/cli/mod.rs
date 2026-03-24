@@ -35,7 +35,6 @@ pub mod exit_codes {
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     // === Global flags ===
-
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     pub verbose: bool,
@@ -56,7 +55,6 @@ pub struct Cli {
     pub command: Option<Commands>,
 
     // === Top-level args for the default usage command ===
-
     /// Provider to query (codex, claude, cursor, gemini, copilot, zed, antigravity, factory, all, both)
     #[arg(short, long)]
     pub provider: Option<String>,

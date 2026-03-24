@@ -8,8 +8,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Warp GraphQL API endpoint
@@ -216,10 +216,8 @@ impl WarpProvider {
         // Check for GraphQL errors
         if let Some(errors) = &gql_response.errors {
             if !errors.is_empty() {
-                let messages: Vec<String> = errors
-                    .iter()
-                    .filter_map(|e| e.message.clone())
-                    .collect();
+                let messages: Vec<String> =
+                    errors.iter().filter_map(|e| e.message.clone()).collect();
                 let summary = if messages.is_empty() {
                     "GraphQL request failed".to_string()
                 } else {

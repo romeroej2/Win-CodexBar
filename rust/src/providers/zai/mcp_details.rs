@@ -121,7 +121,10 @@ impl ZaiLimitEntry {
         }
 
         let used_from_remaining = limit - self.remaining;
-        let used = used_from_remaining.max(self.current_value).max(0).min(limit);
+        let used = used_from_remaining
+            .max(self.current_value)
+            .max(0)
+            .min(limit);
         let percent = (used as f64 / limit as f64) * 100.0;
         percent.clamp(0.0, 100.0)
     }
@@ -239,7 +242,11 @@ impl McpDetailsMenu {
 
         // Sort by model code
         let mut usage_details = time_limit.usage_details.clone();
-        usage_details.sort_by(|a, b| a.model_code.to_lowercase().cmp(&b.model_code.to_lowercase()));
+        usage_details.sort_by(|a, b| {
+            a.model_code
+                .to_lowercase()
+                .cmp(&b.model_code.to_lowercase())
+        });
 
         Some(Self {
             window_label,

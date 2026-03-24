@@ -7,8 +7,8 @@ mod api;
 use async_trait::async_trait;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    SourceMode, UsageSnapshot,
 };
 
 pub use api::CursorApi;

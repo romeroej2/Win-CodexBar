@@ -102,7 +102,10 @@ impl UsageSnapshot {
     pub fn any_exhausted(&self) -> bool {
         self.primary.is_exhausted()
             || self.secondary.as_ref().is_some_and(|w| w.is_exhausted())
-            || self.model_specific.as_ref().is_some_and(|w| w.is_exhausted())
+            || self
+                .model_specific
+                .as_ref()
+                .is_some_and(|w| w.is_exhausted())
     }
 }
 

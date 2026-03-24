@@ -47,15 +47,13 @@ async fn validate_config() -> anyhow::Result<()> {
     if let Some(path) = Settings::settings_path() {
         if path.exists() {
             match std::fs::read_to_string(&path) {
-                Ok(content) => {
-                    match serde_json::from_str::<Settings>(&content) {
-                        Ok(_) => println!("OK"),
-                        Err(e) => {
-                            println!("INVALID");
-                            errors.push(format!("settings.json: {}", e));
-                        }
+                Ok(content) => match serde_json::from_str::<Settings>(&content) {
+                    Ok(_) => println!("OK"),
+                    Err(e) => {
+                        println!("INVALID");
+                        errors.push(format!("settings.json: {}", e));
                     }
-                }
+                },
                 Err(e) => {
                     println!("ERROR");
                     errors.push(format!("settings.json: Could not read file: {}", e));
@@ -75,15 +73,13 @@ async fn validate_config() -> anyhow::Result<()> {
     if let Some(path) = ManualCookies::cookies_path() {
         if path.exists() {
             match std::fs::read_to_string(&path) {
-                Ok(content) => {
-                    match serde_json::from_str::<ManualCookies>(&content) {
-                        Ok(_) => println!("OK"),
-                        Err(e) => {
-                            println!("INVALID");
-                            errors.push(format!("manual_cookies.json: {}", e));
-                        }
+                Ok(content) => match serde_json::from_str::<ManualCookies>(&content) {
+                    Ok(_) => println!("OK"),
+                    Err(e) => {
+                        println!("INVALID");
+                        errors.push(format!("manual_cookies.json: {}", e));
                     }
-                }
+                },
                 Err(e) => {
                     println!("ERROR");
                     errors.push(format!("manual_cookies.json: Could not read file: {}", e));
@@ -128,7 +124,10 @@ async fn validate_config() -> anyhow::Result<()> {
             for e in &errors {
                 println!("  - {}", e);
             }
-            anyhow::bail!("Configuration validation failed with {} error(s).", errors.len());
+            anyhow::bail!(
+                "Configuration validation failed with {} error(s).",
+                errors.len()
+            );
         }
     }
 
@@ -175,7 +174,11 @@ async fn show_paths() -> anyhow::Result<()> {
     }
 
     let token_path = TokenAccountStore::default_path();
-    let exists = if token_path.exists() { "" } else { " (not found)" };
+    let exists = if token_path.exists() {
+        ""
+    } else {
+        " (not found)"
+    };
     println!("  Token accounts: {}{}", token_path.display(), exists);
 
     // Show config directory

@@ -4,4 +4,6 @@ pub mod command_runner;
 
 // Re-exports for future CLI integration
 #[allow(unused_imports)]
-pub use command_runner::{CommandError, CommandOptions, CommandResult, CommandRunner, RollingBuffer};
+pub use command_runner::{
+    CommandError, CommandOptions, CommandResult, CommandRunner, RollingBuffer,
+};

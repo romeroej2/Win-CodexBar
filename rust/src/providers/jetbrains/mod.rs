@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// JetBrains AI provider
@@ -87,7 +87,9 @@ impl JetBrainsProvider {
                 config_dir.join("options").join("ai-assistant.xml"),
                 config_dir.join("options").join("aiAssistant.xml"),
                 config_dir.join("options").join("ai.xml"),
-                config_dir.join("options").join("AIAssistantQuotaManager2.xml"),
+                config_dir
+                    .join("options")
+                    .join("AIAssistantQuotaManager2.xml"),
             ];
 
             for path in possible_paths {
@@ -104,11 +106,13 @@ impl JetBrainsProvider {
     async fn read_local_config(&self) -> Result<UsageSnapshot, ProviderError> {
         let config_file = Self::find_ai_config_file().ok_or_else(|| {
             ProviderError::NotInstalled(
-                "JetBrains AI Assistant not found. Install from JetBrains IDE Marketplace.".to_string()
+                "JetBrains AI Assistant not found. Install from JetBrains IDE Marketplace."
+                    .to_string(),
             )
         })?;
 
-        let content = tokio::fs::read_to_string(&config_file).await
+        let content = tokio::fs::read_to_string(&config_file)
+            .await
             .map_err(|e| ProviderError::Other(format!("Failed to read config: {}", e)))?;
 
         self.parse_xml_config(&content)
@@ -130,13 +134,20 @@ impl JetBrainsProvider {
         for line in content.lines() {
             let line = line.trim();
 
-            if line.contains("usedCredits") || line.contains("used_credits") || line.contains("creditsUsed") {
+            if line.contains("usedCredits")
+                || line.contains("used_credits")
+                || line.contains("creditsUsed")
+            {
                 if let Some(value) = Self::extract_xml_value(line) {
                     used_credits = value;
                 }
             }
 
-            if line.contains("creditLimit") || line.contains("credit_limit") || line.contains("creditsLimit") || line.contains("monthlyLimit") {
+            if line.contains("creditLimit")
+                || line.contains("credit_limit")
+                || line.contains("creditsLimit")
+                || line.contains("monthlyLimit")
+            {
                 if let Some(value) = Self::extract_xml_value(line) {
                     credit_limit = value;
                 }
@@ -149,8 +160,8 @@ impl JetBrainsProvider {
             0.0
         };
 
-        let usage = UsageSnapshot::new(RateWindow::new(used_percent))
-            .with_login_method("JetBrains AI");
+        let usage =
+            UsageSnapshot::new(RateWindow::new(used_percent)).with_login_method("JetBrains AI");
 
         Ok(usage)
     }

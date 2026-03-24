@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 const KIMIK2_API_BASE: &str = "https://api.moonshot.cn";
@@ -72,7 +72,8 @@ impl KimiK2Provider {
     async fn fetch_via_api(&self) -> Result<UsageSnapshot, ProviderError> {
         let api_key = Self::get_api_key().ok_or_else(|| {
             ProviderError::NotInstalled(
-                "Moonshot API key not found. Set MOONSHOT_API_KEY environment variable.".to_string()
+                "Moonshot API key not found. Set MOONSHOT_API_KEY environment variable."
+                    .to_string(),
             )
         })?;
 
@@ -97,31 +98,39 @@ impl KimiK2Provider {
             return Err(ProviderError::Other(format!("API error: {}", status)));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
     /// Parse Kimi K2 usage response
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Extract balance/credit information
         let data = json.get("data").unwrap_or(json);
 
         // Available balance (credits remaining)
-        let available_balance = data.get("available_balance")
+        let available_balance = data
+            .get("available_balance")
             .or_else(|| data.get("balance"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
         // Total credits (used + available)
-        let total_credits = data.get("total_balance")
+        let total_credits = data
+            .get("total_balance")
             .or_else(|| data.get("total"))
             .and_then(|v| v.as_f64())
             .unwrap_or(100.0);
 
         // Used credits
-        let used_credits = data.get("used_balance")
+        let used_credits = data
+            .get("used_balance")
             .or_else(|| data.get("used"))
             .and_then(|v| v.as_f64())
             .unwrap_or(total_credits - available_balance);
@@ -134,14 +143,12 @@ impl KimiK2Provider {
         };
 
         // Cash balance (if any)
-        let cash_balance = data.get("cash_balance")
-            .and_then(|v| v.as_f64());
+        let cash_balance = data.get("cash_balance").and_then(|v| v.as_f64());
 
         // Create primary rate window (credits used)
         let primary = RateWindow::new(used_percent);
 
-        let mut usage = UsageSnapshot::new(primary)
-            .with_login_method("API Key");
+        let mut usage = UsageSnapshot::new(primary).with_login_method("API Key");
 
         // Add secondary window for cash balance if available
         if let Some(cash) = cash_balance {
@@ -180,9 +187,7 @@ impl Provider for KimiK2Provider {
                 let usage = self.fetch_via_api().await?;
                 Ok(ProviderFetchResult::new(usage, "api"))
             }
-            SourceMode::Cli => {
-                Err(ProviderError::UnsupportedSource(SourceMode::Cli))
-            }
+            SourceMode::Cli => Err(ProviderError::UnsupportedSource(SourceMode::Cli)),
         }
     }
 

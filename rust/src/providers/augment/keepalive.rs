@@ -4,11 +4,11 @@
 //! Monitors cookie expiration and proactively refreshes the session before
 //! cookies expire, ensuring uninterrupted access to Augment APIs.
 
+use chrono::{DateTime, Utc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
 
 /// Configuration for the keepalive service
 pub struct KeepaliveConfig {
@@ -99,7 +99,8 @@ impl AugmentSessionKeepalive {
                     &config,
                     &last_refresh_attempt,
                     &last_successful_refresh,
-                ).await;
+                )
+                .await;
 
                 if should_refresh {
                     Self::perform_refresh(
@@ -108,7 +109,8 @@ impl AugmentSessionKeepalive {
                         &last_successful_refresh,
                         &is_refreshing,
                         false,
-                    ).await;
+                    )
+                    .await;
                 }
             }
             tracing::info!("[AugmentKeepalive] Keepalive stopped");
@@ -135,7 +137,8 @@ impl AugmentSessionKeepalive {
             &self.last_successful_refresh,
             &self.is_refreshing,
             true,
-        ).await;
+        )
+        .await;
     }
 
     /// Check if we should refresh the session
@@ -147,7 +150,8 @@ impl AugmentSessionKeepalive {
         // Rate limit check
         if let Some(last_attempt) = *last_refresh_attempt.read().await {
             let elapsed = Utc::now().signed_duration_since(last_attempt);
-            if elapsed < chrono::Duration::from_std(config.min_refresh_interval).unwrap_or_default() {
+            if elapsed < chrono::Duration::from_std(config.min_refresh_interval).unwrap_or_default()
+            {
                 tracing::debug!(
                     "[AugmentKeepalive] Skipping refresh (last attempt {:?} ago)",
                     elapsed
@@ -191,7 +195,10 @@ impl AugmentSessionKeepalive {
         *last_refresh_attempt.write().await = Some(Utc::now());
 
         let action = if forced { "forced" } else { "automatic" };
-        tracing::info!("[AugmentKeepalive] Performing {} session refresh...", action);
+        tracing::info!(
+            "[AugmentKeepalive] Performing {} session refresh...",
+            action
+        );
 
         // Try to ping session endpoints
         match Self::ping_session_endpoint(config).await {
@@ -228,7 +235,8 @@ impl AugmentSessionKeepalive {
         for endpoint in endpoints {
             tracing::debug!("[AugmentKeepalive] Trying endpoint: {}", endpoint);
 
-            match client.get(endpoint)
+            match client
+                .get(endpoint)
                 .header("Accept", "application/json")
                 .header("Origin", "https://app.augmentcode.com")
                 .header("Referer", "https://app.augmentcode.com")

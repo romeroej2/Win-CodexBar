@@ -90,7 +90,11 @@ impl UsagePace {
     /// * `window` - The rate window to analyze
     /// * `now` - Current time (defaults to Utc::now())
     /// * `default_window_minutes` - Default window duration if not specified (10080 = 7 days)
-    pub fn weekly(window: &RateWindow, now: Option<DateTime<Utc>>, default_window_minutes: u32) -> Option<Self> {
+    pub fn weekly(
+        window: &RateWindow,
+        now: Option<DateTime<Utc>>,
+        default_window_minutes: u32,
+    ) -> Option<Self> {
         let now = now.unwrap_or_else(Utc::now);
         let resets_at = window.resets_at?;
         let minutes = window.window_minutes.unwrap_or(default_window_minutes);

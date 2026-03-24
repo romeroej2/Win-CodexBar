@@ -268,9 +268,7 @@ impl EyeBlinkSystem {
             state.effect = MotionEffect::random_for_provider(provider);
 
             // Maybe schedule a double-blink
-            if state.effect == MotionEffect::Blink
-                && rng.random_bool(config.double_blink_chance)
-            {
+            if state.effect == MotionEffect::Blink && rng.random_bool(config.double_blink_chance) {
                 state.pending_second_start = Some(now + BlinkState::double_blink_delay());
             }
 

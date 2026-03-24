@@ -47,67 +47,100 @@ static CODEX_PRICING: LazyLock<HashMap<&'static str, CodexPricing>> = LazyLock::
     let mut m = HashMap::new();
 
     // GPT-5 pricing
-    m.insert("gpt-5", CodexPricing {
-        input_cost_per_token: 1.25e-6,
-        output_cost_per_token: 1e-5,
-        cache_read_input_cost_per_token: 1.25e-7,
-    });
-    m.insert("gpt-5-codex", CodexPricing {
-        input_cost_per_token: 1.25e-6,
-        output_cost_per_token: 1e-5,
-        cache_read_input_cost_per_token: 1.25e-7,
-    });
-    m.insert("gpt-5.1", CodexPricing {
-        input_cost_per_token: 1.25e-6,
-        output_cost_per_token: 1e-5,
-        cache_read_input_cost_per_token: 1.25e-7,
-    });
-    m.insert("gpt-5.2", CodexPricing {
-        input_cost_per_token: 1.75e-6,
-        output_cost_per_token: 1.4e-5,
-        cache_read_input_cost_per_token: 1.75e-7,
-    });
-    m.insert("gpt-5.2-codex", CodexPricing {
-        input_cost_per_token: 1.75e-6,
-        output_cost_per_token: 1.4e-5,
-        cache_read_input_cost_per_token: 1.75e-7,
-    });
+    m.insert(
+        "gpt-5",
+        CodexPricing {
+            input_cost_per_token: 1.25e-6,
+            output_cost_per_token: 1e-5,
+            cache_read_input_cost_per_token: 1.25e-7,
+        },
+    );
+    m.insert(
+        "gpt-5-codex",
+        CodexPricing {
+            input_cost_per_token: 1.25e-6,
+            output_cost_per_token: 1e-5,
+            cache_read_input_cost_per_token: 1.25e-7,
+        },
+    );
+    m.insert(
+        "gpt-5.1",
+        CodexPricing {
+            input_cost_per_token: 1.25e-6,
+            output_cost_per_token: 1e-5,
+            cache_read_input_cost_per_token: 1.25e-7,
+        },
+    );
+    m.insert(
+        "gpt-5.2",
+        CodexPricing {
+            input_cost_per_token: 1.75e-6,
+            output_cost_per_token: 1.4e-5,
+            cache_read_input_cost_per_token: 1.75e-7,
+        },
+    );
+    m.insert(
+        "gpt-5.2-codex",
+        CodexPricing {
+            input_cost_per_token: 1.75e-6,
+            output_cost_per_token: 1.4e-5,
+            cache_read_input_cost_per_token: 1.75e-7,
+        },
+    );
 
     // GPT-5.4 pricing
-    m.insert("gpt-5.4", CodexPricing {
-        input_cost_per_token: 2.5e-6,
-        output_cost_per_token: 1e-5,
-        cache_read_input_cost_per_token: 6.25e-7,
-    });
-    m.insert("gpt-5.4-codex", CodexPricing {
-        input_cost_per_token: 2.5e-6,
-        output_cost_per_token: 1e-5,
-        cache_read_input_cost_per_token: 6.25e-7,
-    });
+    m.insert(
+        "gpt-5.4",
+        CodexPricing {
+            input_cost_per_token: 2.5e-6,
+            output_cost_per_token: 1e-5,
+            cache_read_input_cost_per_token: 6.25e-7,
+        },
+    );
+    m.insert(
+        "gpt-5.4-codex",
+        CodexPricing {
+            input_cost_per_token: 2.5e-6,
+            output_cost_per_token: 1e-5,
+            cache_read_input_cost_per_token: 6.25e-7,
+        },
+    );
 
     // GPT-5.4 Mini pricing
-    m.insert("gpt-5.4-mini", CodexPricing {
-        input_cost_per_token: 4e-7,
-        output_cost_per_token: 1.6e-6,
-        cache_read_input_cost_per_token: 1e-7,
-    });
-    m.insert("gpt-5.4-mini-codex", CodexPricing {
-        input_cost_per_token: 4e-7,
-        output_cost_per_token: 1.6e-6,
-        cache_read_input_cost_per_token: 1e-7,
-    });
+    m.insert(
+        "gpt-5.4-mini",
+        CodexPricing {
+            input_cost_per_token: 4e-7,
+            output_cost_per_token: 1.6e-6,
+            cache_read_input_cost_per_token: 1e-7,
+        },
+    );
+    m.insert(
+        "gpt-5.4-mini-codex",
+        CodexPricing {
+            input_cost_per_token: 4e-7,
+            output_cost_per_token: 1.6e-6,
+            cache_read_input_cost_per_token: 1e-7,
+        },
+    );
 
     // GPT-5.4 Nano pricing
-    m.insert("gpt-5.4-nano", CodexPricing {
-        input_cost_per_token: 1e-7,
-        output_cost_per_token: 4e-7,
-        cache_read_input_cost_per_token: 2.5e-8,
-    });
-    m.insert("gpt-5.4-nano-codex", CodexPricing {
-        input_cost_per_token: 1e-7,
-        output_cost_per_token: 4e-7,
-        cache_read_input_cost_per_token: 2.5e-8,
-    });
+    m.insert(
+        "gpt-5.4-nano",
+        CodexPricing {
+            input_cost_per_token: 1e-7,
+            output_cost_per_token: 4e-7,
+            cache_read_input_cost_per_token: 2.5e-8,
+        },
+    );
+    m.insert(
+        "gpt-5.4-nano-codex",
+        CodexPricing {
+            input_cost_per_token: 1e-7,
+            output_cost_per_token: 4e-7,
+            cache_read_input_cost_per_token: 2.5e-8,
+        },
+    );
 
     m
 });
@@ -117,137 +150,170 @@ static CLAUDE_PRICING: LazyLock<HashMap<&'static str, ClaudePricing>> = LazyLock
     let mut m = HashMap::new();
 
     // Haiku 4.5
-    m.insert("claude-haiku-4-5", ClaudePricing {
-        input_cost_per_token: 1e-6,
-        output_cost_per_token: 5e-6,
-        cache_creation_input_cost_per_token: 1.25e-6,
-        cache_read_input_cost_per_token: 1e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
-    m.insert("claude-haiku-4-5-20251001", ClaudePricing {
-        input_cost_per_token: 1e-6,
-        output_cost_per_token: 5e-6,
-        cache_creation_input_cost_per_token: 1.25e-6,
-        cache_read_input_cost_per_token: 1e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
+    m.insert(
+        "claude-haiku-4-5",
+        ClaudePricing {
+            input_cost_per_token: 1e-6,
+            output_cost_per_token: 5e-6,
+            cache_creation_input_cost_per_token: 1.25e-6,
+            cache_read_input_cost_per_token: 1e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
+    m.insert(
+        "claude-haiku-4-5-20251001",
+        ClaudePricing {
+            input_cost_per_token: 1e-6,
+            output_cost_per_token: 5e-6,
+            cache_creation_input_cost_per_token: 1.25e-6,
+            cache_read_input_cost_per_token: 1e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
 
     // Opus 4.6
-    m.insert("claude-opus-4-6", ClaudePricing {
-        input_cost_per_token: 5e-6,
-        output_cost_per_token: 2.5e-5,
-        cache_creation_input_cost_per_token: 6.25e-6,
-        cache_read_input_cost_per_token: 5e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
-    m.insert("claude-opus-4-6-20260205", ClaudePricing {
-        input_cost_per_token: 5e-6,
-        output_cost_per_token: 2.5e-5,
-        cache_creation_input_cost_per_token: 6.25e-6,
-        cache_read_input_cost_per_token: 5e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
+    m.insert(
+        "claude-opus-4-6",
+        ClaudePricing {
+            input_cost_per_token: 5e-6,
+            output_cost_per_token: 2.5e-5,
+            cache_creation_input_cost_per_token: 6.25e-6,
+            cache_read_input_cost_per_token: 5e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
+    m.insert(
+        "claude-opus-4-6-20260205",
+        ClaudePricing {
+            input_cost_per_token: 5e-6,
+            output_cost_per_token: 2.5e-5,
+            cache_creation_input_cost_per_token: 6.25e-6,
+            cache_read_input_cost_per_token: 5e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
 
     // Opus 4.5
-    m.insert("claude-opus-4-5", ClaudePricing {
-        input_cost_per_token: 5e-6,
-        output_cost_per_token: 2.5e-5,
-        cache_creation_input_cost_per_token: 6.25e-6,
-        cache_read_input_cost_per_token: 5e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
-    m.insert("claude-opus-4-5-20251101", ClaudePricing {
-        input_cost_per_token: 5e-6,
-        output_cost_per_token: 2.5e-5,
-        cache_creation_input_cost_per_token: 6.25e-6,
-        cache_read_input_cost_per_token: 5e-7,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
+    m.insert(
+        "claude-opus-4-5",
+        ClaudePricing {
+            input_cost_per_token: 5e-6,
+            output_cost_per_token: 2.5e-5,
+            cache_creation_input_cost_per_token: 6.25e-6,
+            cache_read_input_cost_per_token: 5e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
+    m.insert(
+        "claude-opus-4-5-20251101",
+        ClaudePricing {
+            input_cost_per_token: 5e-6,
+            output_cost_per_token: 2.5e-5,
+            cache_creation_input_cost_per_token: 6.25e-6,
+            cache_read_input_cost_per_token: 5e-7,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
 
     // Sonnet 4.5 (with tiered pricing at 200k tokens)
-    m.insert("claude-sonnet-4-5", ClaudePricing {
-        input_cost_per_token: 3e-6,
-        output_cost_per_token: 1.5e-5,
-        cache_creation_input_cost_per_token: 3.75e-6,
-        cache_read_input_cost_per_token: 3e-7,
-        threshold_tokens: Some(200_000),
-        input_cost_per_token_above_threshold: Some(6e-6),
-        output_cost_per_token_above_threshold: Some(2.25e-5),
-        cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
-        cache_read_input_cost_per_token_above_threshold: Some(6e-7),
-    });
-    m.insert("claude-sonnet-4-5-20250929", ClaudePricing {
-        input_cost_per_token: 3e-6,
-        output_cost_per_token: 1.5e-5,
-        cache_creation_input_cost_per_token: 3.75e-6,
-        cache_read_input_cost_per_token: 3e-7,
-        threshold_tokens: Some(200_000),
-        input_cost_per_token_above_threshold: Some(6e-6),
-        output_cost_per_token_above_threshold: Some(2.25e-5),
-        cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
-        cache_read_input_cost_per_token_above_threshold: Some(6e-7),
-    });
+    m.insert(
+        "claude-sonnet-4-5",
+        ClaudePricing {
+            input_cost_per_token: 3e-6,
+            output_cost_per_token: 1.5e-5,
+            cache_creation_input_cost_per_token: 3.75e-6,
+            cache_read_input_cost_per_token: 3e-7,
+            threshold_tokens: Some(200_000),
+            input_cost_per_token_above_threshold: Some(6e-6),
+            output_cost_per_token_above_threshold: Some(2.25e-5),
+            cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
+            cache_read_input_cost_per_token_above_threshold: Some(6e-7),
+        },
+    );
+    m.insert(
+        "claude-sonnet-4-5-20250929",
+        ClaudePricing {
+            input_cost_per_token: 3e-6,
+            output_cost_per_token: 1.5e-5,
+            cache_creation_input_cost_per_token: 3.75e-6,
+            cache_read_input_cost_per_token: 3e-7,
+            threshold_tokens: Some(200_000),
+            input_cost_per_token_above_threshold: Some(6e-6),
+            output_cost_per_token_above_threshold: Some(2.25e-5),
+            cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
+            cache_read_input_cost_per_token_above_threshold: Some(6e-7),
+        },
+    );
 
     // Opus 4
-    m.insert("claude-opus-4-20250514", ClaudePricing {
-        input_cost_per_token: 1.5e-5,
-        output_cost_per_token: 7.5e-5,
-        cache_creation_input_cost_per_token: 1.875e-5,
-        cache_read_input_cost_per_token: 1.5e-6,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
-    m.insert("claude-opus-4-1", ClaudePricing {
-        input_cost_per_token: 1.5e-5,
-        output_cost_per_token: 7.5e-5,
-        cache_creation_input_cost_per_token: 1.875e-5,
-        cache_read_input_cost_per_token: 1.5e-6,
-        threshold_tokens: None,
-        input_cost_per_token_above_threshold: None,
-        output_cost_per_token_above_threshold: None,
-        cache_creation_input_cost_per_token_above_threshold: None,
-        cache_read_input_cost_per_token_above_threshold: None,
-    });
+    m.insert(
+        "claude-opus-4-20250514",
+        ClaudePricing {
+            input_cost_per_token: 1.5e-5,
+            output_cost_per_token: 7.5e-5,
+            cache_creation_input_cost_per_token: 1.875e-5,
+            cache_read_input_cost_per_token: 1.5e-6,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
+    m.insert(
+        "claude-opus-4-1",
+        ClaudePricing {
+            input_cost_per_token: 1.5e-5,
+            output_cost_per_token: 7.5e-5,
+            cache_creation_input_cost_per_token: 1.875e-5,
+            cache_read_input_cost_per_token: 1.5e-6,
+            threshold_tokens: None,
+            input_cost_per_token_above_threshold: None,
+            output_cost_per_token_above_threshold: None,
+            cache_creation_input_cost_per_token_above_threshold: None,
+            cache_read_input_cost_per_token_above_threshold: None,
+        },
+    );
 
     // Sonnet 4
-    m.insert("claude-sonnet-4-20250514", ClaudePricing {
-        input_cost_per_token: 3e-6,
-        output_cost_per_token: 1.5e-5,
-        cache_creation_input_cost_per_token: 3.75e-6,
-        cache_read_input_cost_per_token: 3e-7,
-        threshold_tokens: Some(200_000),
-        input_cost_per_token_above_threshold: Some(6e-6),
-        output_cost_per_token_above_threshold: Some(2.25e-5),
-        cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
-        cache_read_input_cost_per_token_above_threshold: Some(6e-7),
-    });
+    m.insert(
+        "claude-sonnet-4-20250514",
+        ClaudePricing {
+            input_cost_per_token: 3e-6,
+            output_cost_per_token: 1.5e-5,
+            cache_creation_input_cost_per_token: 3.75e-6,
+            cache_read_input_cost_per_token: 3e-7,
+            threshold_tokens: Some(200_000),
+            input_cost_per_token_above_threshold: Some(6e-6),
+            output_cost_per_token_above_threshold: Some(2.25e-5),
+            cache_creation_input_cost_per_token_above_threshold: Some(7.5e-6),
+            cache_read_input_cost_per_token_above_threshold: Some(6e-7),
+        },
+    );
 
     m
 });
@@ -436,8 +502,14 @@ mod tests {
     #[test]
     fn test_normalize_codex_model() {
         assert_eq!(CostUsagePricing::normalize_codex_model("gpt-5"), "gpt-5");
-        assert_eq!(CostUsagePricing::normalize_codex_model("openai/gpt-5"), "gpt-5");
-        assert_eq!(CostUsagePricing::normalize_codex_model("gpt-5-codex"), "gpt-5");
+        assert_eq!(
+            CostUsagePricing::normalize_codex_model("openai/gpt-5"),
+            "gpt-5"
+        );
+        assert_eq!(
+            CostUsagePricing::normalize_codex_model("gpt-5-codex"),
+            "gpt-5"
+        );
     }
 
     #[test]
@@ -463,17 +535,20 @@ mod tests {
 
     #[test]
     fn test_claude_cost() {
-        let cost = CostUsagePricing::claude_cost_usd(
-            "claude-haiku-4-5-20251001",
-            1000, 0, 0, 500,
-        );
+        let cost = CostUsagePricing::claude_cost_usd("claude-haiku-4-5-20251001", 1000, 0, 0, 500);
         assert!(cost.is_some());
     }
 
     #[test]
     fn test_format_model_name() {
-        assert_eq!(CostUsagePricing::format_model_name("claude-3.5-sonnet"), "Sonnet 3.5");
-        assert_eq!(CostUsagePricing::format_model_name("claude-opus-4"), "Opus 4");
+        assert_eq!(
+            CostUsagePricing::format_model_name("claude-3.5-sonnet"),
+            "Sonnet 3.5"
+        );
+        assert_eq!(
+            CostUsagePricing::format_model_name("claude-opus-4"),
+            "Opus 4"
+        );
         assert_eq!(CostUsagePricing::format_model_name("gpt-5"), "GPT-5");
     }
 

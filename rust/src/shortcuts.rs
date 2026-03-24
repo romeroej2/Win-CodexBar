@@ -37,7 +37,11 @@ impl ShortcutManager {
     }
 
     /// Register a custom shortcut for opening the menu
-    pub fn set_open_menu_shortcut(&mut self, modifiers: Modifiers, key: Code) -> anyhow::Result<()> {
+    pub fn set_open_menu_shortcut(
+        &mut self,
+        modifiers: Modifiers,
+        key: Code,
+    ) -> anyhow::Result<()> {
         // Unregister old shortcut
         let old = HotKey::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyU);
         let _ = self.manager.unregister(old);

@@ -137,10 +137,13 @@ impl MiniMaxLocalStorageImporter {
     }
 
     /// Extract session from a localStorage path
-    fn extract_from_path(path: &PathBuf, browser_name: &str) -> Result<MiniMaxSession, ImportError> {
+    fn extract_from_path(
+        path: &PathBuf,
+        browser_name: &str,
+    ) -> Result<MiniMaxSession, ImportError> {
         // Look for .ldb or .log files
-        let entries = std::fs::read_dir(path)
-            .map_err(|e| ImportError::AccessDenied(e.to_string()))?;
+        let entries =
+            std::fs::read_dir(path).map_err(|e| ImportError::AccessDenied(e.to_string()))?;
 
         let mut minimax_data: Option<serde_json::Value> = None;
 
@@ -220,34 +223,49 @@ impl MiniMaxLocalStorageImporter {
     }
 
     /// Parse session from extracted JSON
-    fn parse_session_from_json(json: &serde_json::Value, browser_name: &str) -> Result<MiniMaxSession, ImportError> {
-        let access_token = json.get("access_token")
+    fn parse_session_from_json(
+        json: &serde_json::Value,
+        browser_name: &str,
+    ) -> Result<MiniMaxSession, ImportError> {
+        let access_token = json
+            .get("access_token")
             .or_else(|| json.get("token"))
             .or_else(|| json.get("mm_token"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let user_id = json.get("user_id")
+        let user_id = json
+            .get("user_id")
             .or_else(|| json.get("userId"))
             .or_else(|| json.get("id"))
-            .and_then(|v| v.as_str().map(|s| s.to_string())
-                .or_else(|| v.as_i64().map(|n| n.to_string())));
+            .and_then(|v| {
+                v.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| v.as_i64().map(|n| n.to_string()))
+            });
 
-        let group_id = json.get("group_id")
+        let group_id = json
+            .get("group_id")
             .or_else(|| json.get("groupId"))
-            .and_then(|v| v.as_str().map(|s| s.to_string())
-                .or_else(|| v.as_i64().map(|n| n.to_string())));
+            .and_then(|v| {
+                v.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| v.as_i64().map(|n| n.to_string()))
+            });
 
-        let email = json.get("email")
+        let email = json
+            .get("email")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let phone = json.get("phone")
+        let phone = json
+            .get("phone")
             .or_else(|| json.get("mobile"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let plan_type = json.get("plan_type")
+        let plan_type = json
+            .get("plan_type")
             .or_else(|| json.get("planType"))
             .or_else(|| json.get("plan"))
             .and_then(|v| v.as_str())
@@ -255,7 +273,9 @@ impl MiniMaxLocalStorageImporter {
 
         // Need at least access_token or user_id
         if access_token.is_none() && user_id.is_none() {
-            return Err(ImportError::ParseError("No valid session data found".to_string()));
+            return Err(ImportError::ParseError(
+                "No valid session data found".to_string(),
+            ));
         }
 
         Ok(MiniMaxSession {

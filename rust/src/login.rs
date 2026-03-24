@@ -4,11 +4,11 @@
 
 #![allow(dead_code)]
 
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
 use regex_lite::Regex;
+use std::io::{BufRead, BufReader};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
 
 /// Result of a login attempt
 #[derive(Debug, Clone)]
@@ -42,11 +42,18 @@ pub async fn run_claude_login<F>(timeout_secs: u64, on_phase: F) -> LoginResult
 where
     F: Fn(LoginPhase) + Send + 'static,
 {
-    run_cli_login("claude", &["/login"], timeout_secs, on_phase, &[
-        "Successfully logged in",
-        "Login successful",
-        "Logged in successfully",
-    ]).await
+    run_cli_login(
+        "claude",
+        &["/login"],
+        timeout_secs,
+        on_phase,
+        &[
+            "Successfully logged in",
+            "Login successful",
+            "Logged in successfully",
+        ],
+    )
+    .await
 }
 
 /// Run Codex CLI login
@@ -54,11 +61,18 @@ pub async fn run_codex_login<F>(timeout_secs: u64, on_phase: F) -> LoginResult
 where
     F: Fn(LoginPhase) + Send + 'static,
 {
-    run_cli_login("codex", &["auth", "login"], timeout_secs, on_phase, &[
-        "Successfully logged in",
-        "Login successful",
-        "Logged in successfully",
-    ]).await
+    run_cli_login(
+        "codex",
+        &["auth", "login"],
+        timeout_secs,
+        on_phase,
+        &[
+            "Successfully logged in",
+            "Login successful",
+            "Logged in successfully",
+        ],
+    )
+    .await
 }
 
 /// Run Gemini/gcloud login
@@ -66,10 +80,14 @@ pub async fn run_gemini_login<F>(timeout_secs: u64, on_phase: F) -> LoginResult
 where
     F: Fn(LoginPhase) + Send + 'static,
 {
-    run_cli_login("gcloud", &["auth", "login"], timeout_secs, on_phase, &[
-        "You are now logged in",
-        "Credentials saved",
-    ]).await
+    run_cli_login(
+        "gcloud",
+        &["auth", "login"],
+        timeout_secs,
+        on_phase,
+        &["You are now logged in", "Credentials saved"],
+    )
+    .await
 }
 
 /// Run Copilot/GitHub device flow login
@@ -77,10 +95,14 @@ pub async fn run_copilot_login<F>(timeout_secs: u64, on_phase: F) -> LoginResult
 where
     F: Fn(LoginPhase) + Send + 'static,
 {
-    run_cli_login("gh", &["auth", "login", "-w"], timeout_secs, on_phase, &[
-        "Logged in as",
-        "Authentication complete",
-    ]).await
+    run_cli_login(
+        "gh",
+        &["auth", "login", "-w"],
+        timeout_secs,
+        on_phase,
+        &["Logged in as", "Authentication complete"],
+    )
+    .await
 }
 
 /// Generic CLI login runner
@@ -113,14 +135,11 @@ where
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     let mut cmd = Command::new(&binary_path);
-    cmd.args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let mut child = match cmd.spawn()
-    {
+    let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
             return LoginResult {

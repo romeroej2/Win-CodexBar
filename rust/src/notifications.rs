@@ -98,7 +98,12 @@ impl NotificationManager {
     }
 
     /// Send a notification for a status issue
-    pub fn notify_status_issue(&mut self, provider: ProviderId, description: &str, settings: &Settings) {
+    pub fn notify_status_issue(
+        &mut self,
+        provider: ProviderId,
+        description: &str,
+        settings: &Settings,
+    ) {
         let key = (provider, NotificationType::StatusIssue);
         if !self.sent_notifications.contains(&key) {
             self.send_status_notification(provider, description, settings);
@@ -108,7 +113,8 @@ impl NotificationManager {
 
     /// Clear status issue notification (when resolved)
     pub fn clear_status_issue(&mut self, provider: ProviderId) {
-        self.sent_notifications.remove(&(provider, NotificationType::StatusIssue));
+        self.sent_notifications
+            .remove(&(provider, NotificationType::StatusIssue));
     }
 
     /// Check session quota transitions (depleted/restored)
@@ -125,7 +131,11 @@ impl NotificationManager {
 
         const DEPLETED_THRESHOLD: f64 = 99.99; // Consider depleted at 99.99%+
 
-        let previous_percent = self.previous_session_percent.get(&provider).copied().unwrap_or(0.0);
+        let previous_percent = self
+            .previous_session_percent
+            .get(&provider)
+            .copied()
+            .unwrap_or(0.0);
 
         // Check for depleted transition: was not depleted, now is
         if previous_percent < DEPLETED_THRESHOLD && current_percent >= DEPLETED_THRESHOLD {
@@ -136,12 +146,16 @@ impl NotificationManager {
             );
             self.show_toast(title, &body);
             play_alert(AlertSound::Error, settings);
-            self.sent_notifications.insert((provider, NotificationType::SessionDepleted));
+            self.sent_notifications
+                .insert((provider, NotificationType::SessionDepleted));
         }
         // Check for restored transition: was depleted, now is not
         else if previous_percent >= DEPLETED_THRESHOLD && current_percent < DEPLETED_THRESHOLD {
             // Only notify restored if we previously sent a depleted notification
-            if self.sent_notifications.contains(&(provider, NotificationType::SessionDepleted)) {
+            if self
+                .sent_notifications
+                .contains(&(provider, NotificationType::SessionDepleted))
+            {
                 let title = NotificationType::SessionRestored.title();
                 let body = format!(
                     "{} session restored. Session quota is available again.",
@@ -149,26 +163,46 @@ impl NotificationManager {
                 );
                 self.show_toast(title, &body);
                 play_alert(AlertSound::Success, settings);
-                self.sent_notifications.remove(&(provider, NotificationType::SessionDepleted));
+                self.sent_notifications
+                    .remove(&(provider, NotificationType::SessionDepleted));
             }
         }
 
         // Update the tracked previous percent
-        self.previous_session_percent.insert(provider, current_percent);
+        self.previous_session_percent
+            .insert(provider, current_percent);
     }
 
     /// Send a Windows toast notification with sound
-    fn send_notification(&self, provider: ProviderId, used_percent: f64, notif_type: NotificationType, settings: &Settings) {
+    fn send_notification(
+        &self,
+        provider: ProviderId,
+        used_percent: f64,
+        notif_type: NotificationType,
+        settings: &Settings,
+    ) {
         let title = notif_type.title();
         let body = match notif_type {
             NotificationType::HighUsage => {
-                format!("{} usage at {:.0}% - approaching limit", provider.display_name(), used_percent)
+                format!(
+                    "{} usage at {:.0}% - approaching limit",
+                    provider.display_name(),
+                    used_percent
+                )
             }
             NotificationType::CriticalUsage => {
-                format!("{} usage at {:.0}% - critically high!", provider.display_name(), used_percent)
+                format!(
+                    "{} usage at {:.0}% - critically high!",
+                    provider.display_name(),
+                    used_percent
+                )
             }
             NotificationType::Exhausted => {
-                format!("{} usage limit exhausted ({:.0}%)", provider.display_name(), used_percent)
+                format!(
+                    "{} usage limit exhausted ({:.0}%)",
+                    provider.display_name(),
+                    used_percent
+                )
             }
             NotificationType::StatusIssue => {
                 format!("{} is experiencing issues", provider.display_name())
@@ -177,7 +211,10 @@ impl NotificationManager {
                 format!("{} session depleted. 0% left.", provider.display_name())
             }
             NotificationType::SessionRestored => {
-                format!("{} session restored. Quota available again.", provider.display_name())
+                format!(
+                    "{} session restored. Quota available again.",
+                    provider.display_name()
+                )
             }
         };
 
@@ -195,7 +232,12 @@ impl NotificationManager {
         play_alert(alert_sound, settings);
     }
 
-    fn send_status_notification(&self, provider: ProviderId, description: &str, settings: &Settings) {
+    fn send_status_notification(
+        &self,
+        provider: ProviderId,
+        description: &str,
+        settings: &Settings,
+    ) {
         let title = NotificationType::StatusIssue.title();
         let body = format!("{}: {}", provider.display_name(), description);
         self.show_toast(title, &body);
@@ -241,8 +283,7 @@ impl NotificationManager {
             $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
             [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("CodexBar").Show($toast)
             "#,
-            safe_title,
-            safe_body
+            safe_title, safe_body
         );
 
         let _ = Command::new("powershell")

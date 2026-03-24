@@ -12,10 +12,9 @@ use std::collections::HashMap;
 
 // Re-export indicator types for convenience
 pub use indicators::{
-    OverlayPosition, StatusOverlayConfig,
-    StatusLevel as IndicatorStatusLevel,
-    ProviderStatus as IndicatorProviderStatus,
-    StatuspageResponse, StatuspageStatus, StatuspageIncident,
+    OverlayPosition, ProviderStatus as IndicatorProviderStatus,
+    StatusLevel as IndicatorStatusLevel, StatusOverlayConfig, StatuspageIncident,
+    StatuspageResponse, StatuspageStatus,
 };
 
 /// Status level for a provider
@@ -89,7 +88,7 @@ pub fn get_status_page_url(provider: &str) -> Option<&'static str> {
         "copilot" | "github" => Some("https://www.githubstatus.com"),
         "cursor" => Some("https://status.cursor.com"),
         "factory" | "droid" => None, // Factory.ai doesn't have a public status page
-        "zai" | "z.ai" => None, // z.ai doesn't have a public status page
+        "zai" | "z.ai" => None,      // z.ai doesn't have a public status page
         _ => None,
     }
 }
@@ -174,8 +173,14 @@ pub async fn fetch_statuspage_io_components(url: &str) -> Result<ProviderStatus,
 
     if let Some(comps) = json.get("components").and_then(|c| c.as_array()) {
         for comp in comps {
-            let name = comp.get("name").and_then(|n| n.as_str()).unwrap_or("Unknown");
-            let status_str = comp.get("status").and_then(|s| s.as_str()).unwrap_or("unknown");
+            let name = comp
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("Unknown");
+            let status_str = comp
+                .get("status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("unknown");
             let status = StatusLevel::from_indicator(status_str);
 
             // Update overall status to worst component

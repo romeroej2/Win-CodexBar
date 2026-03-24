@@ -57,7 +57,7 @@ fn get_exe_path() -> anyhow::Result<PathBuf> {
 fn enable_autostart() -> anyhow::Result<()> {
     use windows::core::PCWSTR;
     use windows::Win32::System::Registry::{
-        RegSetValueExW, RegOpenKeyExW, RegCloseKey, HKEY_CURRENT_USER, KEY_WRITE, REG_SZ,
+        RegCloseKey, RegOpenKeyExW, RegSetValueExW, HKEY_CURRENT_USER, KEY_WRITE, REG_SZ,
     };
 
     let exe_path = get_exe_path()?;
@@ -105,7 +105,10 @@ fn enable_autostart() -> anyhow::Result<()> {
         let _ = RegCloseKey(hkey);
 
         if result.is_err() {
-            return Err(anyhow::anyhow!("Failed to set registry value: {:?}", result));
+            return Err(anyhow::anyhow!(
+                "Failed to set registry value: {:?}",
+                result
+            ));
         }
     }
 
@@ -117,7 +120,7 @@ fn enable_autostart() -> anyhow::Result<()> {
 fn disable_autostart() -> anyhow::Result<()> {
     use windows::core::PCWSTR;
     use windows::Win32::System::Registry::{
-        RegDeleteValueW, RegOpenKeyExW, RegCloseKey, HKEY_CURRENT_USER, KEY_WRITE,
+        RegCloseKey, RegDeleteValueW, RegOpenKeyExW, HKEY_CURRENT_USER, KEY_WRITE,
     };
 
     let subkey = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -159,7 +162,7 @@ fn disable_autostart() -> anyhow::Result<()> {
 fn is_autostart_enabled() -> bool {
     use windows::core::PCWSTR;
     use windows::Win32::System::Registry::{
-        RegQueryValueExW, RegOpenKeyExW, RegCloseKey, HKEY_CURRENT_USER, KEY_READ,
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ,
     };
 
     let subkey = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -188,14 +191,7 @@ fn is_autostart_enabled() -> bool {
             return false;
         }
 
-        let result = RegQueryValueExW(
-            hkey,
-            PCWSTR(name_wide.as_ptr()),
-            None,
-            None,
-            None,
-            None,
-        );
+        let result = RegQueryValueExW(hkey, PCWSTR(name_wide.as_ptr()), None, None, None, None);
 
         let _ = RegCloseKey(hkey);
 

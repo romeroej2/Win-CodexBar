@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use regex_lite::Regex;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Ollama settings page URL
@@ -108,7 +108,10 @@ impl OllamaProvider {
     /// Parse usage data from the Ollama settings HTML page
     fn parse_usage_html(&self, html: &str) -> Result<UsageSnapshot, ProviderError> {
         // Check if we're signed out
-        if html.contains("Sign in") && !html.contains("Cloud Usage") && !html.contains("Session usage") {
+        if html.contains("Sign in")
+            && !html.contains("Cloud Usage")
+            && !html.contains("Session usage")
+        {
             return Err(ProviderError::AuthRequired);
         }
 

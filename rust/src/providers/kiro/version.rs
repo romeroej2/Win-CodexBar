@@ -2,11 +2,11 @@
 //!
 //! Detect and parse Kiro CLI version for compatibility checks.
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 
 /// Cached CLI path
 static CLI_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();

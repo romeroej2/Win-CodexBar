@@ -8,7 +8,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Provider status level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum StatusLevel {
     /// All systems operational
     #[default]
@@ -78,11 +80,11 @@ impl StatusLevel {
     pub fn status_prefix(&self) -> &'static str {
         match self {
             StatusLevel::Operational => "",
-            StatusLevel::Minor => "\u{1F7E1} ",      // Yellow circle
-            StatusLevel::Major => "\u{1F7E0} ",      // Orange circle
-            StatusLevel::Critical => "\u{1F534} ",   // Red circle
+            StatusLevel::Minor => "\u{1F7E1} ", // Yellow circle
+            StatusLevel::Major => "\u{1F7E0} ", // Orange circle
+            StatusLevel::Critical => "\u{1F534} ", // Red circle
             StatusLevel::Maintenance => "\u{1F535} ", // Blue circle
-            StatusLevel::Unknown => "",              // No dot for unknown
+            StatusLevel::Unknown => "",         // No dot for unknown
         }
     }
 
@@ -187,7 +189,10 @@ impl OverlayPosition {
         match self {
             OverlayPosition::TopRight => (icon_size - dot_size - padding, padding),
             OverlayPosition::TopLeft => (padding, padding),
-            OverlayPosition::BottomRight => (icon_size - dot_size - padding, icon_size - dot_size - padding),
+            OverlayPosition::BottomRight => (
+                icon_size - dot_size - padding,
+                icon_size - dot_size - padding,
+            ),
             OverlayPosition::BottomLeft => (padding, icon_size - dot_size - padding),
         }
     }
@@ -271,10 +276,22 @@ mod tests {
 
     #[test]
     fn test_from_statuspage() {
-        assert_eq!(StatusLevel::from_statuspage("operational"), StatusLevel::Operational);
-        assert_eq!(StatusLevel::from_statuspage("degraded_performance"), StatusLevel::Minor);
-        assert_eq!(StatusLevel::from_statuspage("major_outage"), StatusLevel::Critical);
-        assert_eq!(StatusLevel::from_statuspage("under_maintenance"), StatusLevel::Maintenance);
+        assert_eq!(
+            StatusLevel::from_statuspage("operational"),
+            StatusLevel::Operational
+        );
+        assert_eq!(
+            StatusLevel::from_statuspage("degraded_performance"),
+            StatusLevel::Minor
+        );
+        assert_eq!(
+            StatusLevel::from_statuspage("major_outage"),
+            StatusLevel::Critical
+        );
+        assert_eq!(
+            StatusLevel::from_statuspage("under_maintenance"),
+            StatusLevel::Maintenance
+        );
     }
 
     #[test]

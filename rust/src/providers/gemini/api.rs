@@ -27,7 +27,10 @@ impl GeminiApi {
     /// Fetch quota information from the Gemini API
     /// Returns (primary RateWindow, optional model-specific RateWindow, optional email)
     /// Note: Gemini quota API requires OAuth tokens, not API keys
-    pub async fn fetch_quota(&self, _ctx: &FetchContext) -> Result<(RateWindow, Option<RateWindow>, Option<String>), ProviderError> {
+    pub async fn fetch_quota(
+        &self,
+        _ctx: &FetchContext,
+    ) -> Result<(RateWindow, Option<RateWindow>, Option<String>), ProviderError> {
         // Gemini quota endpoint requires OAuth credentials (not API keys)
         // Always load OAuth credentials from ~/.gemini/oauth_creds.json
         let mut creds = self.load_credentials()?;
@@ -38,11 +41,14 @@ impl GeminiApi {
             creds = self.refresh_token(&creds).await?;
         }
 
-        let access_token = creds.access_token.clone()
+        let access_token = creds
+            .access_token
+            .clone()
             .ok_or_else(|| ProviderError::AuthRequired)?;
 
         // Fetch quota
-        let response = self.client
+        let response = self
+            .client
             .post(QUOTA_ENDPOINT)
             .header("Authorization", format!("Bearer {}", access_token))
             .header("Content-Type", "application/json")
@@ -80,15 +86,21 @@ impl GeminiApi {
             ));
         }
 
-        let content = std::fs::read_to_string(&creds_path)
-            .map_err(|e| ProviderError::Other(format!("Failed to read Gemini credentials: {}", e)))?;
+        let content = std::fs::read_to_string(&creds_path).map_err(|e| {
+            ProviderError::Other(format!("Failed to read Gemini credentials: {}", e))
+        })?;
 
         serde_json::from_str(&content)
             .map_err(|e| ProviderError::Parse(format!("Invalid Gemini credentials: {}", e)))
     }
 
-    async fn refresh_token(&self, creds: &OAuthCredentials) -> Result<OAuthCredentials, ProviderError> {
-        let refresh_token = creds.refresh_token.as_ref()
+    async fn refresh_token(
+        &self,
+        creds: &OAuthCredentials,
+    ) -> Result<OAuthCredentials, ProviderError> {
+        let refresh_token = creds
+            .refresh_token
+            .as_ref()
             .ok_or_else(|| ProviderError::AuthRequired)?;
 
         // Get OAuth client credentials from Gemini CLI
@@ -101,7 +113,8 @@ impl GeminiApi {
             ("grant_type", "refresh_token"),
         ];
 
-        let response = self.client
+        let response = self
+            .client
             .post(TOKEN_REFRESH_ENDPOINT)
             .form(&params)
             .timeout(std::time::Duration::from_secs(10))
@@ -137,8 +150,8 @@ impl GeminiApi {
 
     fn save_credentials(&self, creds: &OAuthCredentials) -> Result<(), ProviderError> {
         let creds_path = self.home_dir.join(".gemini").join("oauth_creds.json");
-        let content = serde_json::to_string_pretty(creds)
-            .map_err(|e| ProviderError::Parse(e.to_string()))?;
+        let content =
+            serde_json::to_string_pretty(creds).map_err(|e| ProviderError::Parse(e.to_string()))?;
         std::fs::write(&creds_path, content)
             .map_err(|e| ProviderError::Other(format!("Failed to save credentials: {}", e)))?;
         Ok(())
@@ -184,9 +197,9 @@ impl GeminiApi {
         response: QuotaResponse,
         creds: Option<&OAuthCredentials>,
     ) -> Result<(RateWindow, Option<RateWindow>, Option<String>), ProviderError> {
-        let buckets = response.buckets.ok_or_else(|| {
-            ProviderError::Parse("No quota buckets in response".to_string())
-        })?;
+        let buckets = response
+            .buckets
+            .ok_or_else(|| ProviderError::Parse("No quota buckets in response".to_string()))?;
 
         if buckets.is_empty() {
             return Err(ProviderError::Parse("Empty quota buckets".to_string()));
@@ -206,13 +219,23 @@ impl GeminiApi {
         }
 
         // Find Flash and Pro quotas
-        let flash_quota = model_quotas.iter()
+        let flash_quota = model_quotas
+            .iter()
             .filter(|(k, _)| k.to_lowercase().contains("flash"))
-            .min_by(|a, b| a.1.0.partial_cmp(&b.1.0).unwrap_or(std::cmp::Ordering::Equal));
+            .min_by(|a, b| {
+                a.1 .0
+                    .partial_cmp(&b.1 .0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
-        let pro_quota = model_quotas.iter()
+        let pro_quota = model_quotas
+            .iter()
             .filter(|(k, _)| k.to_lowercase().contains("pro"))
-            .min_by(|a, b| a.1.0.partial_cmp(&b.1.0).unwrap_or(std::cmp::Ordering::Equal));
+            .min_by(|a, b| {
+                a.1 .0
+                    .partial_cmp(&b.1 .0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
         // Build primary RateWindow from the most constrained quota
         let (primary_fraction, primary_reset) = if let Some((_, (frac, reset))) = pro_quota {
@@ -341,11 +364,11 @@ fn extract_email_from_jwt(token: &str) -> Option<String> {
         payload.push_str(&"=".repeat(4 - remainder));
     }
 
-    let decoded = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        &payload,
-    ).ok()?;
+    let decoded =
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &payload).ok()?;
 
     let json: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
-    json.get("email").and_then(|v| v.as_str()).map(|s| s.to_string())
+    json.get("email")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }

@@ -9,8 +9,8 @@ use serde::Deserialize;
 use crate::browser::cookies::CookieExtractor;
 use crate::browser::detection::BrowserDetector;
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Factory.ai API endpoints
@@ -88,7 +88,8 @@ impl FactoryProvider {
             if let Ok(cookies) = CookieExtractor::extract_for_domain(browser, "app.factory.ai") {
                 if !cookies.is_empty() {
                     // Convert to cookie header string
-                    let cookie_str = cookies.iter()
+                    let cookie_str = cookies
+                        .iter()
                         .map(|c| c.to_header_value())
                         .collect::<Vec<_>>()
                         .join("; ");
@@ -125,7 +126,8 @@ impl FactoryProvider {
             )));
         }
 
-        resp.json().await
+        resp.json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))
     }
 
@@ -154,7 +156,8 @@ impl FactoryProvider {
             )));
         }
 
-        resp.json().await
+        resp.json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))
     }
 

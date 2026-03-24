@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Synthetic provider
@@ -69,7 +69,8 @@ impl SyntheticProvider {
             if config_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&config_file).await {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                        if let Some(token) = json.get("apiKey")
+                        if let Some(token) = json
+                            .get("apiKey")
                             .or_else(|| json.get("accessToken"))
                             .and_then(|v| v.as_str())
                         {
@@ -84,7 +85,8 @@ impl SyntheticProvider {
             if creds_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&creds_file).await {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                        if let Some(token) = json.get("apiKey")
+                        if let Some(token) = json
+                            .get("apiKey")
                             .or_else(|| json.get("token"))
                             .and_then(|v| v.as_str())
                         {
@@ -118,21 +120,28 @@ impl SyntheticProvider {
             return Err(ProviderError::AuthRequired);
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Parse Synthetic usage response
-        let used = json.get("usage")
+        let used = json
+            .get("usage")
             .or_else(|| json.get("used"))
             .or_else(|| json.get("tokensUsed"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let limit = json.get("limit")
+        let limit = json
+            .get("limit")
             .or_else(|| json.get("quota"))
             .or_else(|| json.get("tokensLimit"))
             .and_then(|v| v.as_f64())
@@ -144,21 +153,22 @@ impl SyntheticProvider {
             0.0
         };
 
-        let plan = json.get("plan")
+        let plan = json
+            .get("plan")
             .or_else(|| json.get("tier"))
             .or_else(|| json.get("subscription"))
             .and_then(|v| v.as_str())
             .unwrap_or("Synthetic");
 
-        let reset_time = json.get("resetAt")
+        let reset_time = json
+            .get("resetAt")
             .or_else(|| json.get("periodEnd"))
             .or_else(|| json.get("resetsAt"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
         let primary_window = RateWindow::with_details(used_percent, None, None, reset_time);
-        let usage = UsageSnapshot::new(primary_window)
-            .with_login_method(plan);
+        let usage = UsageSnapshot::new(primary_window).with_login_method(plan);
 
         Ok(usage)
     }
@@ -222,9 +232,7 @@ impl Provider for SyntheticProvider {
                 let usage = self.probe_cli(ctx).await?;
                 Ok(ProviderFetchResult::new(usage, "cli"))
             }
-            SourceMode::OAuth => {
-                Err(ProviderError::UnsupportedSource(SourceMode::OAuth))
-            }
+            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
         }
     }
 

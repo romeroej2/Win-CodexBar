@@ -347,7 +347,10 @@ impl ProviderFetchPipeline {
             // Try to fetch
             match strategy.fetch(context).await {
                 Ok(result) => {
-                    attempts.push(ProviderFetchAttempt::success(strategy.id(), strategy.kind()));
+                    attempts.push(ProviderFetchAttempt::success(
+                        strategy.id(),
+                        strategy.kind(),
+                    ));
                     return ProviderFetchOutcome::success(result, attempts);
                 }
                 Err(error) => {

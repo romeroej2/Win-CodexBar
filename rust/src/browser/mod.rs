@@ -7,4 +7,4 @@ pub mod watchdog;
 
 // Re-exports for future UI integration
 #[allow(unused_imports)]
-pub use watchdog::{WebProbeWatchdog, WatchdogConfig, WatchdogError, global_watchdog};
+pub use watchdog::{global_watchdog, WatchdogConfig, WatchdogError, WebProbeWatchdog};

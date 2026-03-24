@@ -4,15 +4,15 @@
 //! Uses Windows process detection to find CSRF token
 
 use async_trait::async_trait;
+use regex_lite::Regex;
 use serde::Deserialize;
-use std::process::Command;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
-use regex_lite::Regex;
+use std::process::Command;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Antigravity provider
@@ -53,12 +53,13 @@ impl AntigravityProvider {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .map_err(|e| ProviderError::Other(format!("Failed to run PowerShell: {}", e)))?;
 
         if !output.status.success() {
             return Err(ProviderError::NotInstalled(
-                "Failed to detect Antigravity process".to_string()
+                "Failed to detect Antigravity process".to_string(),
             ));
         }
 
@@ -90,7 +91,7 @@ impl AntigravityProvider {
         }
 
         Err(ProviderError::NotInstalled(
-            "Antigravity language server not running".to_string()
+            "Antigravity language server not running".to_string(),
         ))
     }
 
@@ -110,10 +111,14 @@ impl AntigravityProvider {
 
         for offset in 0..20 {
             let port = extension_port + offset;
-            let url = format!("https://127.0.0.1:{}/exa.language_server_pb.LanguageServerService/GetUnleashData", port);
+            let url = format!(
+                "https://127.0.0.1:{}/exa.language_server_pb.LanguageServerService/GetUnleashData",
+                port
+            );
 
             // Just check if the port responds (even with error)
-            if let Ok(resp) = client.post(&url)
+            if let Ok(resp) = client
+                .post(&url)
                 .header("Content-Type", "application/json")
                 .header("Connect-Protocol-Version", "1")
                 .body("{}")
@@ -129,8 +134,12 @@ impl AntigravityProvider {
 
         // Fallback: try common ports
         for port in [53835, 53836, 53837, 53838, 53845, 53849] {
-            let url = format!("https://127.0.0.1:{}/exa.language_server_pb.LanguageServerService/GetUnleashData", port);
-            if let Ok(resp) = client.post(&url)
+            let url = format!(
+                "https://127.0.0.1:{}/exa.language_server_pb.LanguageServerService/GetUnleashData",
+                port
+            );
+            if let Ok(resp) = client
+                .post(&url)
                 .header("Content-Type", "application/json")
                 .header("Connect-Protocol-Version", "1")
                 .body("{}")
@@ -143,7 +152,9 @@ impl AntigravityProvider {
             }
         }
 
-        Err(ProviderError::Other("Could not find Antigravity API port".to_string()))
+        Err(ProviderError::Other(
+            "Could not find Antigravity API port".to_string(),
+        ))
     }
 
     /// Fetch user status from Antigravity API
@@ -173,7 +184,8 @@ impl AntigravityProvider {
             }
         });
 
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .header("Content-Type", "application/json")
             .header("Connect-Protocol-Version", "1")
             .header("X-Codeium-Csrf-Token", &process_info.csrf_token)
@@ -185,20 +197,30 @@ impl AntigravityProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(ProviderError::Other(format!("API error {}: {}", status, text)));
+            return Err(ProviderError::Other(format!(
+                "API error {}: {}",
+                status, text
+            )));
         }
 
-        let json: UserStatusResponse = resp.json().await
+        let json: UserStatusResponse = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Other(format!("Failed to parse response: {}", e)))?;
 
         self.parse_user_status(json)
     }
 
-    fn parse_user_status(&self, response: UserStatusResponse) -> Result<UsageSnapshot, ProviderError> {
-        let user_status = response.user_status
+    fn parse_user_status(
+        &self,
+        response: UserStatusResponse,
+    ) -> Result<UsageSnapshot, ProviderError> {
+        let user_status = response
+            .user_status
             .ok_or_else(|| ProviderError::Other("Missing userStatus".to_string()))?;
 
-        let model_configs = user_status.cascade_model_config_data
+        let model_configs = user_status
+            .cascade_model_config_data
             .and_then(|d| d.client_model_configs)
             .unwrap_or_default();
 
@@ -210,7 +232,10 @@ impl AntigravityProvider {
         for config in &model_configs {
             let label_lower = config.label.to_lowercase();
 
-            if primary.is_none() && label_lower.contains("claude") && !label_lower.contains("thinking") {
+            if primary.is_none()
+                && label_lower.contains("claude")
+                && !label_lower.contains("thinking")
+            {
                 if let Some(quota) = &config.quota_info {
                     let remaining = quota.remaining_fraction.unwrap_or(1.0);
                     let used_percent = (1.0 - remaining) * 100.0;
@@ -221,7 +246,10 @@ impl AntigravityProvider {
                         quota.reset_time.clone(),
                     ));
                 }
-            } else if secondary.is_none() && label_lower.contains("pro") && label_lower.contains("low") {
+            } else if secondary.is_none()
+                && label_lower.contains("pro")
+                && label_lower.contains("low")
+            {
                 if let Some(quota) = &config.quota_info {
                     let remaining = quota.remaining_fraction.unwrap_or(1.0);
                     let used_percent = (1.0 - remaining) * 100.0;
@@ -273,7 +301,8 @@ impl AntigravityProvider {
         }
 
         // Add plan info
-        let plan_name = user_status.plan_status
+        let plan_name = user_status
+            .plan_status
             .and_then(|ps| ps.plan_info)
             .and_then(|pi| pi.plan_display_name.or(pi.plan_name));
 

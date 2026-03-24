@@ -349,8 +349,8 @@ mod tests {
 
     #[test]
     fn test_widget_provider_entry() {
-        let entry = WidgetProviderEntry::new(ProviderId::Claude, Utc::now())
-            .with_credits_remaining(100.0);
+        let entry =
+            WidgetProviderEntry::new(ProviderId::Claude, Utc::now()).with_credits_remaining(100.0);
 
         assert_eq!(entry.provider, ProviderId::Claude);
         assert_eq!(entry.credits_remaining, Some(100.0));

@@ -353,7 +353,9 @@ impl ProviderRegistry {
         let providers = self.providers.read().unwrap();
         // We need to clone here, but since Provider is not Clone, we'll return None for now
         // In practice, we'll use Arc<dyn Provider> instead
-        providers.get(&id).map(|_| todo!("Use Arc<dyn Provider> instead"))
+        providers
+            .get(&id)
+            .map(|_| todo!("Use Arc<dyn Provider> instead"))
     }
 
     /// Get all registered provider IDs
@@ -429,12 +431,24 @@ mod tests {
 
     #[test]
     fn test_provider_id_from_cli_name() {
-        assert_eq!(ProviderId::from_cli_name("claude"), Some(ProviderId::Claude));
-        assert_eq!(ProviderId::from_cli_name("anthropic"), Some(ProviderId::Claude));
-        assert_eq!(ProviderId::from_cli_name("CLAUDE"), Some(ProviderId::Claude));
+        assert_eq!(
+            ProviderId::from_cli_name("claude"),
+            Some(ProviderId::Claude)
+        );
+        assert_eq!(
+            ProviderId::from_cli_name("anthropic"),
+            Some(ProviderId::Claude)
+        );
+        assert_eq!(
+            ProviderId::from_cli_name("CLAUDE"),
+            Some(ProviderId::Claude)
+        );
         assert_eq!(ProviderId::from_cli_name("codex"), Some(ProviderId::Codex));
         assert_eq!(ProviderId::from_cli_name("openai"), Some(ProviderId::Codex));
-        assert_eq!(ProviderId::from_cli_name("factory"), Some(ProviderId::Factory));
+        assert_eq!(
+            ProviderId::from_cli_name("factory"),
+            Some(ProviderId::Factory)
+        );
         assert_eq!(ProviderId::from_cli_name("zed"), Some(ProviderId::Zai));
         assert_eq!(ProviderId::from_cli_name("unknown"), None);
     }
@@ -482,7 +496,10 @@ mod tests {
         assert_eq!(ProviderId::Cursor.cookie_domain(), Some("cursor.com"));
         assert_eq!(ProviderId::Factory.cookie_domain(), Some("app.factory.ai"));
         assert_eq!(ProviderId::Codex.cookie_domain(), Some("chatgpt.com"));
-        assert_eq!(ProviderId::Gemini.cookie_domain(), Some("aistudio.google.com"));
+        assert_eq!(
+            ProviderId::Gemini.cookie_domain(),
+            Some("aistudio.google.com")
+        );
         assert_eq!(ProviderId::Kiro.cookie_domain(), Some("kiro.dev"));
         assert_eq!(ProviderId::Kimi.cookie_domain(), Some("kimi.moonshot.cn"));
         assert_eq!(ProviderId::OpenCode.cookie_domain(), Some("opencode.ai"));

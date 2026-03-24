@@ -47,10 +47,7 @@ impl MenuInvalidationTracker {
         if !open.is_empty() {
             // Defer invalidation until menus close
             self.pending_invalidation.fetch_add(1, Ordering::SeqCst);
-            tracing::debug!(
-                "Menu invalidation deferred (open menus: {})",
-                open.len()
-            );
+            tracing::debug!("Menu invalidation deferred (open menus: {})", open.len());
             return false;
         }
         drop(open);
@@ -261,7 +258,11 @@ impl StalenessChecker {
 
     /// Get time since last update
     pub fn time_since_update(&self, key: &str) -> Option<Duration> {
-        self.update_times.read().unwrap().get(key).map(|t| t.elapsed())
+        self.update_times
+            .read()
+            .unwrap()
+            .get(key)
+            .map(|t| t.elapsed())
     }
 
     /// Clear all tracked times

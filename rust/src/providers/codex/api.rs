@@ -33,7 +33,9 @@ impl CodexApi {
 
     /// Fetch usage information from Codex API
     /// Returns (UsageSnapshot, optional CostSnapshot)
-    pub async fn fetch_usage(&self) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
+    pub async fn fetch_usage(
+        &self,
+    ) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
         // Load credentials
         let creds = self.load_credentials()?;
 
@@ -42,7 +44,8 @@ impl CodexApi {
         let url = format!("{}{}", base_url, USAGE_PATH);
 
         // Build request
-        let mut request = self.client
+        let mut request = self
+            .client
             .get(&url)
             .header("Authorization", format!("Bearer {}", creds.access_token))
             .header("User-Agent", "CodexBar")
@@ -86,8 +89,9 @@ impl CodexApi {
             ));
         }
 
-        let content = std::fs::read_to_string(&auth_path)
-            .map_err(|e| ProviderError::Other(format!("Failed to read Codex credentials: {}", e)))?;
+        let content = std::fs::read_to_string(&auth_path).map_err(|e| {
+            ProviderError::Other(format!("Failed to read Codex credentials: {}", e))
+        })?;
 
         let json: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| ProviderError::Parse(format!("Invalid Codex credentials JSON: {}", e)))?;
@@ -109,18 +113,23 @@ impl CodexApi {
             ProviderError::Parse("Codex auth.json exists but contains no tokens.".to_string())
         })?;
 
-        let access_token = tokens.get("access_token")
+        let access_token = tokens
+            .get("access_token")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
-            .ok_or_else(|| ProviderError::Parse("Missing access_token in Codex credentials".to_string()))?
+            .ok_or_else(|| {
+                ProviderError::Parse("Missing access_token in Codex credentials".to_string())
+            })?
             .to_string();
 
-        let refresh_token = tokens.get("refresh_token")
+        let refresh_token = tokens
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
-        let account_id = tokens.get("account_id")
+        let account_id = tokens
+            .get("account_id")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
@@ -161,19 +170,29 @@ impl CodexApi {
             if let Some(base_url) = parse_chatgpt_base_url(&content) {
                 let normalized = normalize_base_url(&base_url);
                 // Only allow HTTPS URLs for custom base URLs to prevent token exfiltration
-                if normalized.starts_with("https://") || normalized.starts_with("http://127.0.0.1") || normalized.starts_with("http://localhost") {
+                if normalized.starts_with("https://")
+                    || normalized.starts_with("http://127.0.0.1")
+                    || normalized.starts_with("http://localhost")
+                {
                     return normalized;
                 }
-                tracing::warn!("Ignoring insecure custom chatgpt_base_url (must be HTTPS): {}", normalized);
+                tracing::warn!(
+                    "Ignoring insecure custom chatgpt_base_url (must be HTTPS): {}",
+                    normalized
+                );
             }
         }
 
         DEFAULT_BASE_URL.to_string()
     }
 
-    fn build_result_from_json(&self, json: &serde_json::Value) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
+    fn build_result_from_json(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
         // Extract plan type
-        let plan_type = json.get("plan_type")
+        let plan_type = json
+            .get("plan_type")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
@@ -181,19 +200,17 @@ impl CodexApi {
         let (primary, secondary, code_review) = self.extract_rate_limits(json);
 
         // Build login method string
-        let login_method = plan_type.as_ref().map(|pt| {
-            match pt.as_str() {
-                "guest" => "Guest".to_string(),
-                "free" => "ChatGPT Free".to_string(),
-                "go" => "ChatGPT Go".to_string(),
-                "plus" => "ChatGPT Plus".to_string(),
-                "pro" => "ChatGPT Pro".to_string(),
-                "team" => "ChatGPT Team".to_string(),
-                "business" => "ChatGPT Business".to_string(),
-                "enterprise" => "ChatGPT Enterprise".to_string(),
-                "education" | "edu" => "ChatGPT Education".to_string(),
-                other => format!("ChatGPT {}", capitalize(other)),
-            }
+        let login_method = plan_type.as_ref().map(|pt| match pt.as_str() {
+            "guest" => "Guest".to_string(),
+            "free" => "ChatGPT Free".to_string(),
+            "go" => "ChatGPT Go".to_string(),
+            "plus" => "ChatGPT Plus".to_string(),
+            "pro" => "ChatGPT Pro".to_string(),
+            "team" => "ChatGPT Team".to_string(),
+            "business" => "ChatGPT Business".to_string(),
+            "enterprise" => "ChatGPT Enterprise".to_string(),
+            "education" | "edu" => "ChatGPT Education".to_string(),
+            other => format!("ChatGPT {}", capitalize(other)),
         });
 
         let mut usage = UsageSnapshot::new(primary);
@@ -213,17 +230,23 @@ impl CodexApi {
         Ok((usage, cost))
     }
 
-    fn extract_rate_limits(&self, json: &serde_json::Value) -> (RateWindow, Option<RateWindow>, Option<RateWindow>) {
+    fn extract_rate_limits(
+        &self,
+        json: &serde_json::Value,
+    ) -> (RateWindow, Option<RateWindow>, Option<RateWindow>) {
         // Try rate_limit object
         if let Some(rate_limit) = json.get("rate_limit") {
-            let primary = rate_limit.get("primary_window")
+            let primary = rate_limit
+                .get("primary_window")
                 .map(|w| self.parse_window(w))
                 .unwrap_or_else(|| RateWindow::new(0.0));
 
-            let secondary = rate_limit.get("secondary_window")
+            let secondary = rate_limit
+                .get("secondary_window")
                 .map(|w| self.parse_window(w));
 
-            let code_review = rate_limit.get("code_review_window")
+            let code_review = rate_limit
+                .get("code_review_window")
                 .map(|w| self.parse_window(w));
 
             return (primary, secondary, code_review);
@@ -240,7 +263,8 @@ impl CodexApi {
         }
 
         // Try direct fields
-        let used_percent = json.get("used_percent")
+        let used_percent = json
+            .get("used_percent")
             .or_else(|| json.get("usage_percent"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
@@ -249,17 +273,25 @@ impl CodexApi {
     }
 
     fn parse_window(&self, window: &serde_json::Value) -> RateWindow {
-        let used_percent = window.get("used_percent")
+        let used_percent = window
+            .get("used_percent")
             .or_else(|| window.get("usage_percent"))
             .and_then(|v| v.as_f64())
-            .or_else(|| window.get("used_percent").and_then(|v| v.as_i64()).map(|i| i as f64))
+            .or_else(|| {
+                window
+                    .get("used_percent")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as f64)
+            })
             .unwrap_or(0.0);
 
-        let window_minutes = window.get("limit_window_seconds")
+        let window_minutes = window
+            .get("limit_window_seconds")
             .and_then(|v| v.as_i64())
             .map(|s| (s / 60) as u32);
 
-        let reset_at = window.get("reset_at")
+        let reset_at = window
+            .get("reset_at")
             .and_then(|v| v.as_i64())
             .and_then(|ts| Utc.timestamp_opt(ts, 0).single());
 
@@ -269,7 +301,8 @@ impl CodexApi {
     fn extract_credits(&self, json: &serde_json::Value) -> Option<CostSnapshot> {
         let credits = json.get("credits")?;
 
-        let has_credits = credits.get("has_credits")
+        let has_credits = credits
+            .get("has_credits")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -277,7 +310,8 @@ impl CodexApi {
             return None;
         }
 
-        let unlimited = credits.get("unlimited")
+        let unlimited = credits
+            .get("unlimited")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -285,14 +319,18 @@ impl CodexApi {
             return None;
         }
 
-        let balance = credits.get("balance")
+        let balance = credits
+            .get("balance")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
         Some(CostSnapshot::new(balance, "USD", "Credits"))
     }
 
-    fn build_result(&self, response: UsageResponse) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
+    fn build_result(
+        &self,
+        response: UsageResponse,
+    ) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
         // Extract primary rate window
         let primary = if let Some(ref rate_limit) = response.rate_limit {
             if let Some(ref primary_window) = rate_limit.primary_window {
@@ -310,7 +348,9 @@ impl CodexApi {
         };
 
         // Extract secondary rate window
-        let secondary = response.rate_limit.as_ref()
+        let secondary = response
+            .rate_limit
+            .as_ref()
             .and_then(|rl| rl.secondary_window.as_ref())
             .map(|window| {
                 RateWindow::with_details(
@@ -322,7 +362,9 @@ impl CodexApi {
             });
 
         // Extract code review rate window
-        let code_review = response.rate_limit.as_ref()
+        let code_review = response
+            .rate_limit
+            .as_ref()
             .and_then(|rl| rl.code_review_window.as_ref())
             .map(|window| {
                 RateWindow::with_details(
@@ -334,19 +376,17 @@ impl CodexApi {
             });
 
         // Build usage snapshot
-        let login_method = response.plan_type.as_ref().map(|pt| {
-            match pt.as_str() {
-                "guest" => "Guest".to_string(),
-                "free" => "ChatGPT Free".to_string(),
-                "go" => "ChatGPT Go".to_string(),
-                "plus" => "ChatGPT Plus".to_string(),
-                "pro" => "ChatGPT Pro".to_string(),
-                "team" => "ChatGPT Team".to_string(),
-                "business" => "ChatGPT Business".to_string(),
-                "enterprise" => "ChatGPT Enterprise".to_string(),
-                "education" | "edu" => "ChatGPT Education".to_string(),
-                other => format!("ChatGPT {}", capitalize(other)),
-            }
+        let login_method = response.plan_type.as_ref().map(|pt| match pt.as_str() {
+            "guest" => "Guest".to_string(),
+            "free" => "ChatGPT Free".to_string(),
+            "go" => "ChatGPT Go".to_string(),
+            "plus" => "ChatGPT Plus".to_string(),
+            "pro" => "ChatGPT Pro".to_string(),
+            "team" => "ChatGPT Team".to_string(),
+            "business" => "ChatGPT Business".to_string(),
+            "enterprise" => "ChatGPT Enterprise".to_string(),
+            "education" | "edu" => "ChatGPT Education".to_string(),
+            other => format!("ChatGPT {}", capitalize(other)),
         });
 
         let mut usage = UsageSnapshot::new(primary);
@@ -451,9 +491,10 @@ fn parse_chatgpt_base_url(config_content: &str) -> Option<String> {
             if key == "chatgpt_base_url" {
                 let mut value = value.trim();
                 // Remove quotes
-                if (value.starts_with('"') && value.ends_with('"')) ||
-                   (value.starts_with('\'') && value.ends_with('\'')) {
-                    value = &value[1..value.len()-1];
+                if (value.starts_with('"') && value.ends_with('"'))
+                    || (value.starts_with('\'') && value.ends_with('\''))
+                {
+                    value = &value[1..value.len() - 1];
                 }
                 return Some(value.trim().to_string());
             }
@@ -474,7 +515,8 @@ fn normalize_base_url(url: &str) -> String {
     }
 
     // Add /backend-api if needed
-    if (trimmed.starts_with("https://chatgpt.com") || trimmed.starts_with("https://chat.openai.com"))
+    if (trimmed.starts_with("https://chatgpt.com")
+        || trimmed.starts_with("https://chat.openai.com"))
         && !trimmed.contains("/backend-api")
     {
         trimmed.push_str("/backend-api");

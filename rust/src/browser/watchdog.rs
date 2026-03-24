@@ -163,8 +163,13 @@ impl WebProbeWatchdog {
     }
 
     /// Register a process to be watched
-    pub async fn register(&self, name: impl Into<String>, child: Child) -> Result<u32, WatchdogError> {
-        self.register_with_timeout(name, child, self.config.default_timeout).await
+    pub async fn register(
+        &self,
+        name: impl Into<String>,
+        child: Child,
+    ) -> Result<u32, WatchdogError> {
+        self.register_with_timeout(name, child, self.config.default_timeout)
+            .await
     }
 
     /// Register a process with a custom timeout
@@ -216,7 +221,10 @@ impl WebProbeWatchdog {
         let mut procs = self.processes.write().await;
 
         if let Some(mut tracked) = procs.remove(&id) {
-            tracked.child.kill().map_err(|e| WatchdogError::KillFailed(e.to_string()))?;
+            tracked
+                .child
+                .kill()
+                .map_err(|e| WatchdogError::KillFailed(e.to_string()))?;
             Ok(())
         } else {
             Err(WatchdogError::NotFound)

@@ -7,14 +7,16 @@ pub mod mcp_details;
 
 // Re-exports for MCP details menu
 #[allow(unused_imports)]
-pub use mcp_details::{McpDetailsMenu, ZaiLimitEntry, ZaiLimitType, ZaiLimitUnit, ZaiUsageDetail, ZaiUsageSnapshot};
+pub use mcp_details::{
+    McpDetailsMenu, ZaiLimitEntry, ZaiLimitType, ZaiLimitUnit, ZaiUsageDetail, ZaiUsageSnapshot,
+};
 
 use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// z.ai API endpoint for quota/usage
@@ -128,29 +130,38 @@ impl ZaiProvider {
             )));
         }
 
-        let resp_bytes = resp.bytes().await
+        let resp_bytes = resp
+            .bytes()
+            .await
             .map_err(|e| ProviderError::Other(e.to_string()))?;
 
         // Handle empty response body (can happen with wrong region/endpoint)
         if resp_bytes.is_empty() {
             return Err(ProviderError::Parse(
-                "Empty response body from z.ai API. Check API region and token.".to_string()
+                "Empty response body from z.ai API. Check API region and token.".to_string(),
             ));
         }
 
-        let quota: ZaiQuotaResponse = serde_json::from_slice(&resp_bytes)
-            .map_err(|e| ProviderError::Parse(e.to_string()))?;
+        let quota: ZaiQuotaResponse =
+            serde_json::from_slice(&resp_bytes).map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_quota_response(&quota)
     }
 
-    fn parse_quota_response(&self, quota: &ZaiQuotaResponse) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_quota_response(
+        &self,
+        quota: &ZaiQuotaResponse,
+    ) -> Result<UsageSnapshot, ProviderError> {
         // Find tokens limit (primary/session)
-        let tokens_limit = quota.limits.iter()
+        let tokens_limit = quota
+            .limits
+            .iter()
             .find(|l| l.limit_type.as_deref() == Some("tokens"));
 
         // Find MCP limit (weekly/secondary)
-        let mcp_limit = quota.limits.iter()
+        let mcp_limit = quota
+            .limits
+            .iter()
             .find(|l| l.limit_type.as_deref() == Some("mcp"));
 
         // Calculate session (tokens) usage percentage
@@ -184,8 +195,8 @@ impl ZaiProvider {
             0.0
         };
 
-        let mut usage = UsageSnapshot::new(RateWindow::new(session_percent))
-            .with_login_method("z.ai");
+        let mut usage =
+            UsageSnapshot::new(RateWindow::new(session_percent)).with_login_method("z.ai");
 
         // Add secondary (MCP) usage if available
         if mcp_limit.is_some() {

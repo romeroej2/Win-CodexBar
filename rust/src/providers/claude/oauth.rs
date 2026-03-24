@@ -7,7 +7,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-use crate::core::{ProviderError, RateWindow, UsageSnapshot, ProviderFetchResult};
+use crate::core::{ProviderError, ProviderFetchResult, RateWindow, UsageSnapshot};
 
 /// OAuth credentials from Claude CLI
 #[derive(Debug, Clone)]
@@ -173,13 +173,11 @@ impl ClaudeOAuthFetcher {
             ));
         }
 
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            ProviderError::OAuth(format!("Failed to read credentials file: {}", e))
-        })?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| ProviderError::OAuth(format!("Failed to read credentials file: {}", e)))?;
 
-        let file: CredentialsFile = serde_json::from_str(&content).map_err(|e| {
-            ProviderError::OAuth(format!("Invalid credentials format: {}", e))
-        })?;
+        let file: CredentialsFile = serde_json::from_str(&content)
+            .map_err(|e| ProviderError::OAuth(format!("Invalid credentials format: {}", e)))?;
 
         let oauth = file.claude_ai_oauth.ok_or_else(|| {
             ProviderError::OAuth(
@@ -244,7 +242,10 @@ impl ClaudeOAuthFetcher {
         let response = self
             .client
             .get(Self::USAGE_URL)
-            .header("Authorization", format!("Bearer {}", credentials.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", credentials.access_token),
+            )
             .timeout(std::time::Duration::from_secs(10))
             .send()
             .await?;
@@ -272,9 +273,10 @@ impl ClaudeOAuthFetcher {
             )));
         }
 
-        let usage: OAuthUsageResponse = response.json().await.map_err(|e| {
-            ProviderError::Parse(format!("Failed to parse OAuth response: {}", e))
-        })?;
+        let usage: OAuthUsageResponse = response
+            .json()
+            .await
+            .map_err(|e| ProviderError::Parse(format!("Failed to parse OAuth response: {}", e)))?;
 
         Ok(usage)
     }
@@ -295,14 +297,26 @@ impl ClaudeOAuthFetcher {
         let mut usage = UsageSnapshot::new(primary);
 
         // Secondary: 7-day window
-        if let Some(weekly) = response.seven_day.as_ref().and_then(|w| Self::to_rate_window(w, Some(10080))) {
+        if let Some(weekly) = response
+            .seven_day
+            .as_ref()
+            .and_then(|w| Self::to_rate_window(w, Some(10080)))
+        {
             usage = usage.with_secondary(weekly);
         }
 
         // Model-specific: Opus or Sonnet
-        if let Some(opus) = response.seven_day_opus.as_ref().and_then(|w| Self::to_rate_window(w, Some(10080))) {
+        if let Some(opus) = response
+            .seven_day_opus
+            .as_ref()
+            .and_then(|w| Self::to_rate_window(w, Some(10080)))
+        {
             usage = usage.with_model_specific(opus);
-        } else if let Some(sonnet) = response.seven_day_sonnet.as_ref().and_then(|w| Self::to_rate_window(w, Some(10080))) {
+        } else if let Some(sonnet) = response
+            .seven_day_sonnet
+            .as_ref()
+            .and_then(|w| Self::to_rate_window(w, Some(10080)))
+        {
             usage = usage.with_model_specific(sonnet);
         }
 

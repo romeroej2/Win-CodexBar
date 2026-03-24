@@ -145,7 +145,8 @@ impl LoadingPattern {
         let idx = (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis() as usize) % patterns.len();
+            .as_millis() as usize)
+            % patterns.len();
         patterns[idx]
     }
 }

@@ -4,7 +4,9 @@
 
 use clap::{Parser, Subcommand};
 
-use crate::core::{ProviderId, ProviderAccountData, TokenAccount, TokenAccountStore, TokenAccountSupport};
+use crate::core::{
+    ProviderAccountData, ProviderId, TokenAccount, TokenAccountStore, TokenAccountSupport,
+};
 
 /// Arguments for the account command
 #[derive(Parser, Debug)]
@@ -51,7 +53,11 @@ pub enum AccountCommand {
 pub async fn run(args: AccountArgs) -> anyhow::Result<()> {
     match args.command {
         AccountCommand::List { provider } => list_accounts(&provider).await,
-        AccountCommand::Add { provider, label, token } => add_account(&provider, &label, &token).await,
+        AccountCommand::Add {
+            provider,
+            label,
+            token,
+        } => add_account(&provider, &label, &token).await,
         AccountCommand::Remove { provider, account } => remove_account(&provider, &account).await,
         AccountCommand::Switch { provider, account } => switch_account(&provider, &account).await,
     }
@@ -62,7 +68,10 @@ async fn list_accounts(provider_name: &str) -> anyhow::Result<()> {
     let provider = parse_provider(provider_name)?;
 
     if !TokenAccountSupport::is_supported(provider) {
-        println!("{} does not support token accounts.", provider.display_name());
+        println!(
+            "{} does not support token accounts.",
+            provider.display_name()
+        );
         return Ok(());
     }
 
@@ -71,17 +80,27 @@ async fn list_accounts(provider_name: &str) -> anyhow::Result<()> {
 
     if data.accounts.is_empty() {
         println!("No accounts configured for {}.", provider.display_name());
-        println!("Use 'codexbar account add {}' to add one.", provider.cli_name());
+        println!(
+            "Use 'codexbar account add {}' to add one.",
+            provider.cli_name()
+        );
         return Ok(());
     }
 
     println!("{} accounts:", provider.display_name());
     for (i, account) in data.accounts.iter().enumerate() {
-        let active = if i == data.clamped_active_index() { " (active)" } else { "" };
+        let active = if i == data.clamped_active_index() {
+            " (active)"
+        } else {
+            ""
+        };
         let masked_token = mask_token(&account.token);
         println!("  {}. {}{}", i + 1, account.label, active);
         println!("     Token: {}", masked_token);
-        println!("     Added: {}", account.added_at_datetime().format("%Y-%m-%d %H:%M"));
+        println!(
+            "     Added: {}",
+            account.added_at_datetime().format("%Y-%m-%d %H:%M")
+        );
         if let Some(last_used) = account.last_used_datetime() {
             println!("     Last used: {}", last_used.format("%Y-%m-%d %H:%M"));
         }
@@ -95,14 +114,21 @@ async fn add_account(provider_name: &str, label: &str, token: &str) -> anyhow::R
     let provider = parse_provider(provider_name)?;
 
     if !TokenAccountSupport::is_supported(provider) {
-        anyhow::bail!("{} does not support token accounts.", provider.display_name());
+        anyhow::bail!(
+            "{} does not support token accounts.",
+            provider.display_name()
+        );
     }
 
     let store = TokenAccountStore::new();
     let mut data = store.load_provider(provider)?;
 
     // Check for duplicate label
-    if data.accounts.iter().any(|a| a.label.eq_ignore_ascii_case(label)) {
+    if data
+        .accounts
+        .iter()
+        .any(|a| a.label.eq_ignore_ascii_case(label))
+    {
         anyhow::bail!("An account with label '{}' already exists.", label);
     }
 
@@ -119,7 +145,10 @@ async fn remove_account(provider_name: &str, account_ref: &str) -> anyhow::Resul
     let provider = parse_provider(provider_name)?;
 
     if !TokenAccountSupport::is_supported(provider) {
-        anyhow::bail!("{} does not support token accounts.", provider.display_name());
+        anyhow::bail!(
+            "{} does not support token accounts.",
+            provider.display_name()
+        );
     }
 
     let store = TokenAccountStore::new();
@@ -132,7 +161,11 @@ async fn remove_account(provider_name: &str, account_ref: &str) -> anyhow::Resul
     data.remove_account(id);
     store.save_provider(provider, &data)?;
 
-    println!("Removed account '{}' from {}.", label, provider.display_name());
+    println!(
+        "Removed account '{}' from {}.",
+        label,
+        provider.display_name()
+    );
     Ok(())
 }
 
@@ -141,7 +174,10 @@ async fn switch_account(provider_name: &str, account_ref: &str) -> anyhow::Resul
     let provider = parse_provider(provider_name)?;
 
     if !TokenAccountSupport::is_supported(provider) {
-        anyhow::bail!("{} does not support token accounts.", provider.display_name());
+        anyhow::bail!(
+            "{} does not support token accounts.",
+            provider.display_name()
+        );
     }
 
     let store = TokenAccountStore::new();
@@ -154,7 +190,11 @@ async fn switch_account(provider_name: &str, account_ref: &str) -> anyhow::Resul
     data.set_active_by_id(id);
     store.save_provider(provider, &data)?;
 
-    println!("Switched to account '{}' for {}.", label, provider.display_name());
+    println!(
+        "Switched to account '{}' for {}.",
+        label,
+        provider.display_name()
+    );
     Ok(())
 }
 
@@ -165,7 +205,10 @@ fn parse_provider(name: &str) -> anyhow::Result<ProviderId> {
 }
 
 /// Find account by label or index
-fn find_account<'a>(data: &'a ProviderAccountData, account_ref: &str) -> anyhow::Result<&'a TokenAccount> {
+fn find_account<'a>(
+    data: &'a ProviderAccountData,
+    account_ref: &str,
+) -> anyhow::Result<&'a TokenAccount> {
     // Try parsing as index first (1-based)
     if let Ok(idx) = account_ref.parse::<usize>() {
         if idx > 0 && idx <= data.accounts.len() {
@@ -174,16 +217,27 @@ fn find_account<'a>(data: &'a ProviderAccountData, account_ref: &str) -> anyhow:
     }
 
     // Try matching by label (case-insensitive)
-    if let Some(account) = data.accounts.iter().find(|a| a.label.eq_ignore_ascii_case(account_ref)) {
+    if let Some(account) = data
+        .accounts
+        .iter()
+        .find(|a| a.label.eq_ignore_ascii_case(account_ref))
+    {
         return Ok(account);
     }
 
     // Try matching by UUID prefix
-    if let Some(account) = data.accounts.iter().find(|a| a.id.to_string().starts_with(account_ref)) {
+    if let Some(account) = data
+        .accounts
+        .iter()
+        .find(|a| a.id.to_string().starts_with(account_ref))
+    {
         return Ok(account);
     }
 
-    anyhow::bail!("Account '{}' not found. Use 'codexbar account list' to see available accounts.", account_ref)
+    anyhow::bail!(
+        "Account '{}' not found. Use 'codexbar account list' to see available accounts.",
+        account_ref
+    )
 }
 
 /// Mask a token for display (show first 4 and last 4 chars)

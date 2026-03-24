@@ -13,8 +13,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::core::{
-    FetchContext, Provider, ProviderId, ProviderError, ProviderFetchResult,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 /// Augment provider
@@ -73,11 +73,12 @@ impl AugmentProvider {
         // Check for token file
         let token_file = config_path.join("auth.json");
         if token_file.exists() {
-            let content = tokio::fs::read_to_string(&token_file).await
+            let content = tokio::fs::read_to_string(&token_file)
+                .await
                 .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-            let json: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| ProviderError::Parse(e.to_string()))?;
+            let json: serde_json::Value =
+                serde_json::from_str(&content).map_err(|e| ProviderError::Parse(e.to_string()))?;
 
             if let Some(token) = json.get("access_token").and_then(|v| v.as_str()) {
                 return Ok(token.to_string());
@@ -95,11 +96,21 @@ impl AugmentProvider {
 
     async fn get_vscode_augment_settings() -> Option<String> {
         #[cfg(target_os = "windows")]
-        let settings_path = dirs::config_dir()
-            .map(|p| p.join("Code").join("User").join("globalStorage").join("augment.augment-vscode").join("auth.json"));
+        let settings_path = dirs::config_dir().map(|p| {
+            p.join("Code")
+                .join("User")
+                .join("globalStorage")
+                .join("augment.augment-vscode")
+                .join("auth.json")
+        });
         #[cfg(not(target_os = "windows"))]
-        let settings_path = dirs::config_dir()
-            .map(|p| p.join("Code").join("User").join("globalStorage").join("augment.augment-vscode").join("auth.json"));
+        let settings_path = dirs::config_dir().map(|p| {
+            p.join("Code")
+                .join("User")
+                .join("globalStorage")
+                .join("augment.augment-vscode")
+                .join("auth.json")
+        });
 
         if let Some(path) = settings_path {
             if path.exists() {
@@ -135,19 +146,26 @@ impl AugmentProvider {
             return Err(ProviderError::AuthRequired);
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
         self.parse_usage_response(&json)
     }
 
-    fn parse_usage_response(&self, json: &serde_json::Value) -> Result<UsageSnapshot, ProviderError> {
-        let used = json.get("used_credits")
+    fn parse_usage_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
+        let used = json
+            .get("used_credits")
             .or_else(|| json.get("usage"))
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let limit = json.get("credit_limit")
+        let limit = json
+            .get("credit_limit")
             .or_else(|| json.get("limit"))
             .and_then(|v| v.as_f64())
             .unwrap_or(100.0);
@@ -158,17 +176,18 @@ impl AugmentProvider {
             0.0
         };
 
-        let email = json.get("email")
+        let email = json
+            .get("email")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let plan = json.get("plan")
+        let plan = json
+            .get("plan")
             .or_else(|| json.get("subscription"))
             .and_then(|v| v.as_str())
             .unwrap_or("Augment");
 
-        let mut usage = UsageSnapshot::new(RateWindow::new(used_percent))
-            .with_login_method(plan);
+        let mut usage = UsageSnapshot::new(RateWindow::new(used_percent)).with_login_method(plan);
 
         if let Some(email) = email {
             usage = usage.with_email(email);
@@ -183,13 +202,15 @@ impl AugmentProvider {
         let augment_path = Self::which_augment();
         let config_path = Self::get_augment_config_path();
 
-        if augment_path.map(|p| p.exists()).unwrap_or(false) || config_path.map(|p| p.exists()).unwrap_or(false) {
-            let usage = UsageSnapshot::new(RateWindow::new(0.0))
-                .with_login_method("Augment (installed)");
+        if augment_path.map(|p| p.exists()).unwrap_or(false)
+            || config_path.map(|p| p.exists()).unwrap_or(false)
+        {
+            let usage =
+                UsageSnapshot::new(RateWindow::new(0.0)).with_login_method("Augment (installed)");
             Ok(usage)
         } else {
             Err(ProviderError::NotInstalled(
-                "Augment not found. Install from https://www.augmentcode.com".to_string()
+                "Augment not found. Install from https://www.augmentcode.com".to_string(),
             ))
         }
     }
@@ -230,9 +251,7 @@ impl Provider for AugmentProvider {
                 let usage = self.probe_cli().await?;
                 Ok(ProviderFetchResult::new(usage, "cli"))
             }
-            SourceMode::OAuth => {
-                Err(ProviderError::UnsupportedSource(SourceMode::OAuth))
-            }
+            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
         }
     }
 

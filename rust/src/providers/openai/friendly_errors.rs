@@ -4,11 +4,8 @@
 //! into human-readable error messages with actionable guidance.
 
 /// Indicators that suggest the page is a public landing page
-const LANDING_PAGE_INDICATORS: &[&str] = &[
-    "skip to content",
-    "about openai",
-    "learn about chatgpt",
-];
+const LANDING_PAGE_INDICATORS: &[&str] =
+    &["skip to content", "about openai", "learn about chatgpt"];
 
 /// Indicators that suggest the user is logged out
 const LOGGED_OUT_INDICATORS: &[&str] = &[
@@ -34,12 +31,7 @@ const CLOUDFLARE_INDICATORS: &[&str] = &[
 ];
 
 /// Rate limit indicators
-const RATE_LIMIT_INDICATORS: &[&str] = &[
-    "rate limit",
-    "too many requests",
-    "429",
-    "slow down",
-];
+const RATE_LIMIT_INDICATORS: &[&str] = &["rate limit", "too many requests", "429", "slow down"];
 
 /// Server error indicators
 const SERVER_ERROR_INDICATORS: &[&str] = &[
@@ -68,7 +60,10 @@ pub enum OpenAIWebErrorKind {
     /// Empty response
     EmptyResponse,
     /// Cookie mismatch with expected account
-    CookieMismatch { expected: String, got: Option<String> },
+    CookieMismatch {
+        expected: String,
+        got: Option<String>,
+    },
     /// Unknown error (page doesn't match known patterns)
     Unknown,
 }
@@ -111,9 +106,7 @@ impl OpenAIWebErrorKind {
             && (lower.contains("about") || lower.contains("openai") || lower.contains("chatgpt"));
 
         // Check if it looks logged out
-        let looks_logged_out = LOGGED_OUT_INDICATORS
-            .iter()
-            .any(|ind| lower.contains(ind));
+        let looks_logged_out = LOGGED_OUT_INDICATORS.iter().any(|ind| lower.contains(ind));
 
         if looks_like_landing {
             return Some(OpenAIWebErrorKind::PublicLanding);
@@ -208,7 +201,10 @@ pub fn friendly_error(
             ))
         }
 
-        OpenAIWebErrorKind::CookieMismatch { ref expected, ref got } => {
+        OpenAIWebErrorKind::CookieMismatch {
+            ref expected,
+            ref got,
+        } => {
             let got_label = got.as_deref().unwrap_or("a different account");
             Some(format!(
                 "Cookie mismatch: expected {} but got {}. \
@@ -278,7 +274,12 @@ pub fn is_logged_out(html: &str) -> bool {
 
     // Fall back to content detection
     OpenAIWebErrorKind::detect(html)
-        .map(|k| matches!(k, OpenAIWebErrorKind::NotLoggedIn | OpenAIWebErrorKind::PublicLanding))
+        .map(|k| {
+            matches!(
+                k,
+                OpenAIWebErrorKind::NotLoggedIn | OpenAIWebErrorKind::PublicLanding
+            )
+        })
         .unwrap_or(false)
 }
 

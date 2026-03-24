@@ -62,7 +62,10 @@ impl OpenAIDashboardSnapshot {
     }
 
     /// Create daily breakdown from credit events
-    pub fn make_daily_breakdown(events: &[CreditEvent], max_days: usize) -> Vec<OpenAIDashboardDailyBreakdown> {
+    pub fn make_daily_breakdown(
+        events: &[CreditEvent],
+        max_days: usize,
+    ) -> Vec<OpenAIDashboardDailyBreakdown> {
         if events.is_empty() {
             return Vec::new();
         }
@@ -87,7 +90,10 @@ impl OpenAIDashboardSnapshot {
                 let service_totals = totals.get(&day).cloned().unwrap_or_default();
                 let mut services: Vec<_> = service_totals
                     .into_iter()
-                    .map(|(service, credits_used)| OpenAIDashboardServiceUsage { service, credits_used })
+                    .map(|(service, credits_used)| OpenAIDashboardServiceUsage {
+                        service,
+                        credits_used,
+                    })
                     .collect();
 
                 // Sort by credits used descending, then by service name
@@ -289,21 +295,9 @@ mod tests {
     #[test]
     fn test_daily_breakdown() {
         let events = vec![
-            CreditEvent::new(
-                NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
-                "CLI",
-                10.5,
-            ),
-            CreditEvent::new(
-                NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
-                "API",
-                5.0,
-            ),
-            CreditEvent::new(
-                NaiveDate::from_ymd_opt(2026, 1, 14).unwrap(),
-                "CLI",
-                3.0,
-            ),
+            CreditEvent::new(NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(), "CLI", 10.5),
+            CreditEvent::new(NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(), "API", 5.0),
+            CreditEvent::new(NaiveDate::from_ymd_opt(2026, 1, 14).unwrap(), "CLI", 3.0),
         ];
 
         let breakdown = OpenAIDashboardSnapshot::make_daily_breakdown(&events, 30);

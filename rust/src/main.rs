@@ -58,10 +58,14 @@ fn main() {
     let log_path = std::env::temp_dir().join("codexbar_launch.log");
     let args: Vec<String> = std::env::args().collect();
     let redacted_args = redact_sensitive_args(&args);
-    let _ = std::fs::write(&log_path, format!("main() started at {:?}\nArgs: {:?}\n",
-        std::time::SystemTime::now(),
-        redacted_args
-    ));
+    let _ = std::fs::write(
+        &log_path,
+        format!(
+            "main() started at {:?}\nArgs: {:?}\n",
+            std::time::SystemTime::now(),
+            redacted_args
+        ),
+    );
 
     let exit_code = run();
 
@@ -103,28 +107,24 @@ fn run() -> i32 {
     };
 
     match cli.command {
-        Some(Commands::Usage(args)) => {
-            rt.block_on(async {
-                match cli::usage::run(args).await {
-                    Ok(()) => exit_codes::SUCCESS,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        categorize_error(&e)
-                    }
+        Some(Commands::Usage(args)) => rt.block_on(async {
+            match cli::usage::run(args).await {
+                Ok(()) => exit_codes::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    categorize_error(&e)
                 }
-            })
-        }
-        Some(Commands::Cost(args)) => {
-            rt.block_on(async {
-                match cli::cost::run(args).await {
-                    Ok(()) => exit_codes::SUCCESS,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        categorize_error(&e)
-                    }
+            }
+        }),
+        Some(Commands::Cost(args)) => rt.block_on(async {
+            match cli::cost::run(args).await {
+                Ok(()) => exit_codes::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    categorize_error(&e)
                 }
-            })
-        }
+            }
+        }),
         Some(Commands::Menubar) => {
             // Hide the console window for GUI mode
             #[cfg(windows)]
@@ -144,44 +144,41 @@ fn run() -> i32 {
                 Err(_) => exit_codes::UNEXPECTED_FAILURE,
             }
         }
-        Some(Commands::Autostart(args)) => {
-            rt.block_on(async {
-                match cli::autostart::run(args).await {
-                    Ok(()) => exit_codes::SUCCESS,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        exit_codes::UNEXPECTED_FAILURE
-                    }
+        Some(Commands::Autostart(args)) => rt.block_on(async {
+            match cli::autostart::run(args).await {
+                Ok(()) => exit_codes::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    exit_codes::UNEXPECTED_FAILURE
                 }
-            })
-        }
-        Some(Commands::Account(args)) => {
-            rt.block_on(async {
-                match cli::account::run(args).await {
-                    Ok(()) => exit_codes::SUCCESS,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        exit_codes::UNEXPECTED_FAILURE
-                    }
+            }
+        }),
+        Some(Commands::Account(args)) => rt.block_on(async {
+            match cli::account::run(args).await {
+                Ok(()) => exit_codes::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    exit_codes::UNEXPECTED_FAILURE
                 }
-            })
-        }
-        Some(Commands::Config(args)) => {
-            rt.block_on(async {
-                match cli::config::run(args).await {
-                    Ok(()) => exit_codes::SUCCESS,
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        exit_codes::UNEXPECTED_FAILURE
-                    }
+            }
+        }),
+        Some(Commands::Config(args)) => rt.block_on(async {
+            match cli::config::run(args).await {
+                Ok(()) => exit_codes::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    exit_codes::UNEXPECTED_FAILURE
                 }
-            })
-        }
+            }
+        }),
         None => {
             // Default: launch menubar GUI
             // Log to file since we can't see console output
             let log_path = std::env::temp_dir().join("codexbar_launch.log");
-            let _ = std::fs::write(&log_path, format!("Starting at {:?}\n", std::time::SystemTime::now()));
+            let _ = std::fs::write(
+                &log_path,
+                format!("Starting at {:?}\n", std::time::SystemTime::now()),
+            );
 
             let _guard = match single_instance::SingleInstanceGuard::try_acquire() {
                 Some(guard) => guard,

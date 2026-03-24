@@ -3,11 +3,11 @@
 //! Prevents multiple instances of the menubar app from running simultaneously.
 
 #[cfg(windows)]
+use windows::core::PCWSTR;
+#[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 #[cfg(windows)]
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
-#[cfg(windows)]
-use windows::core::PCWSTR;
 
 /// Guard that holds the single instance mutex
 /// When dropped, the mutex is released
@@ -38,8 +38,8 @@ impl SingleInstanceGuard {
 
         unsafe {
             let handle = CreateMutexW(
-                None,           // default security attributes
-                true,           // initially owned
+                None, // default security attributes
+                true, // initially owned
                 PCWSTR(wide_name.as_ptr()),
             );
 
