@@ -10,6 +10,15 @@ use serde::Deserialize;
 const BASE_URL: &str = "https://cursor.com";
 const COOKIE_DOMAINS: [&str; 2] = ["cursor.com", "cursor.sh"];
 
+type CursorUsageResult = (
+    RateWindow,
+    Option<RateWindow>,
+    Option<RateWindow>,
+    Option<CostSnapshot>,
+    Option<String>,
+    Option<String>,
+);
+
 /// Cursor API client
 pub struct CursorApi {
     client: reqwest::Client,
@@ -24,19 +33,7 @@ impl CursorApi {
 
     /// Fetch usage information from Cursor API
     /// Returns (primary, secondary, model_specific, cost, email, plan_type)
-    pub async fn fetch_usage(
-        &self,
-    ) -> Result<
-        (
-            RateWindow,
-            Option<RateWindow>,
-            Option<RateWindow>,
-            Option<CostSnapshot>,
-            Option<String>,
-            Option<String>,
-        ),
-        ProviderError,
-    > {
+    pub async fn fetch_usage(&self) -> Result<CursorUsageResult, ProviderError> {
         // Try to get cookies from browser
         let cookie_header = self.get_cookie_header()?;
 
@@ -131,17 +128,7 @@ impl CursorApi {
         &self,
         summary: UsageSummary,
         user_info: Option<UserInfo>,
-    ) -> Result<
-        (
-            RateWindow,
-            Option<RateWindow>,
-            Option<RateWindow>,
-            Option<CostSnapshot>,
-            Option<String>,
-            Option<String>,
-        ),
-        ProviderError,
-    > {
+    ) -> Result<CursorUsageResult, ProviderError> {
         let billing_end = summary
             .billing_cycle_end
             .as_ref()
