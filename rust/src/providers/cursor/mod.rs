@@ -25,8 +25,8 @@ impl CursorProvider {
             metadata: ProviderMetadata {
                 id: ProviderId::Cursor,
                 display_name: "Cursor",
-                session_label: "Monthly",
-                weekly_label: "Monthly",
+                session_label: "Plan",
+                weekly_label: "Auto",
                 supports_opus: false,
                 supports_credits: true,
                 default_enabled: true,
@@ -59,8 +59,14 @@ impl Provider for CursorProvider {
         tracing::debug!("Fetching Cursor usage via web API");
 
         match self.api.fetch_usage().await {
-            Ok((primary, cost, email, plan_type)) => {
+            Ok((primary, secondary, model_specific, cost, email, plan_type)) => {
                 let mut usage = UsageSnapshot::new(primary);
+                if let Some(sec) = secondary {
+                    usage = usage.with_secondary(sec);
+                }
+                if let Some(ms) = model_specific {
+                    usage = usage.with_model_specific(ms);
+                }
                 if let Some(e) = email {
                     usage = usage.with_email(e);
                 }

@@ -23,12 +23,14 @@ impl CursorApi {
     }
 
     /// Fetch usage information from Cursor API
-    /// Returns (primary RateWindow, optional CostSnapshot, optional email, optional plan_type)
+    /// Returns (primary, secondary, model_specific, cost, email, plan_type)
     pub async fn fetch_usage(
         &self,
     ) -> Result<
         (
             RateWindow,
+            Option<RateWindow>,
+            Option<RateWindow>,
             Option<CostSnapshot>,
             Option<String>,
             Option<String>,
@@ -132,62 +134,67 @@ impl CursorApi {
     ) -> Result<
         (
             RateWindow,
+            Option<RateWindow>,
+            Option<RateWindow>,
             Option<CostSnapshot>,
             Option<String>,
             Option<String>,
         ),
         ProviderError,
     > {
-        // Parse billing cycle end date
         let billing_end = summary
             .billing_cycle_end
             .as_ref()
             .and_then(|s| parse_iso_date(s));
 
-        // Extract plan usage for primary rate window
-        let (percent_used, cost_snapshot) = if let Some(individual) = &summary.individual_usage {
-            if let Some(plan) = &individual.plan {
-                // Get raw values (in cents)
-                let used_cents = plan.used.unwrap_or(0) as f64;
-                let limit_cents = plan
-                    .breakdown
-                    .as_ref()
-                    .and_then(|b| b.total)
-                    .or(plan.limit)
-                    .unwrap_or(0) as f64;
+        let (percent_used, secondary, model_specific, cost_snapshot) =
+            if let Some(individual) = &summary.individual_usage {
+                if let Some(plan) = &individual.plan {
+                    let used_cents = plan.used.unwrap_or(0) as f64;
+                    let limit_cents = plan
+                        .breakdown
+                        .as_ref()
+                        .and_then(|b| b.total)
+                        .or(plan.limit)
+                        .unwrap_or(0) as f64;
 
-                let percent = if limit_cents > 0.0 {
-                    (used_cents / limit_cents) * 100.0
+                    let percent = if limit_cents > 0.0 {
+                        (used_cents / limit_cents) * 100.0
+                    } else {
+                        plan.total_percent_used.unwrap_or(0.0) * 100.0
+                    };
+
+                    let secondary = plan.auto_percent_used.map(|v| {
+                        RateWindow::with_details(v * 100.0, None, billing_end, None)
+                    });
+
+                    let model_specific = plan.api_percent_used.map(|v| {
+                        RateWindow::with_details(v * 100.0, None, billing_end, None)
+                    });
+
+                    let mut cost = CostSnapshot::new(used_cents / 100.0, "USD", "Monthly");
+                    if limit_cents > 0.0 {
+                        cost = cost.with_limit(limit_cents / 100.0);
+                    }
+                    if let Some(reset) = billing_end {
+                        cost = cost.with_resets_at(reset);
+                    }
+
+                    (percent, secondary, model_specific, Some(cost))
                 } else {
-                    plan.total_percent_used.unwrap_or(0.0) * 100.0
-                };
-
-                // Build cost snapshot
-                let mut cost = CostSnapshot::new(used_cents / 100.0, "USD", "Monthly");
-                if limit_cents > 0.0 {
-                    cost = cost.with_limit(limit_cents / 100.0);
+                    (0.0, None, None, None)
                 }
-                if let Some(reset) = billing_end {
-                    cost = cost.with_resets_at(reset);
-                }
-
-                (percent, Some(cost))
             } else {
-                (0.0, None)
-            }
-        } else {
-            (0.0, None)
-        };
+                (0.0, None, None, None)
+            };
 
-        // Build primary rate window
         let primary = RateWindow::with_details(
             percent_used,
-            None, // Monthly, not fixed window
+            None,
             billing_end,
             None,
         );
 
-        // Format plan type
         let plan_type = summary
             .membership_type
             .as_ref()
@@ -201,7 +208,7 @@ impl CursorApi {
 
         let email = user_info.as_ref().and_then(|u| u.email.clone());
 
-        Ok((primary, cost_snapshot, email, plan_type))
+        Ok((primary, secondary, model_specific, cost_snapshot, email, plan_type))
     }
 }
 
@@ -301,5 +308,121 @@ fn capitalize(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().chain(chars).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn api() -> CursorApi {
+        CursorApi::new()
+    }
+
+    fn parse_summary(json: &str) -> UsageSummary {
+        serde_json::from_str(json).expect("fixture should parse")
+    }
+
+    #[test]
+    fn test_cursor_build_result_with_lanes() {
+        let json = r#"{
+            "billingCycleStart": "2026-03-01T00:00:00Z",
+            "billingCycleEnd": "2026-04-01T00:00:00Z",
+            "membershipType": "pro",
+            "individualUsage": {
+                "plan": {
+                    "used": 1500,
+                    "limit": 5000,
+                    "totalPercentUsed": 0.30,
+                    "autoPercentUsed": 0.20,
+                    "apiPercentUsed": 0.10
+                }
+            }
+        }"#;
+
+        let summary = parse_summary(json);
+        let (primary, secondary, model_specific, cost, _email, plan_type) =
+            api().build_result(summary, None).unwrap();
+
+        assert!((primary.used_percent - 30.0).abs() < 0.01);
+
+        let sec = secondary.expect("secondary should be present");
+        assert!((sec.used_percent - 20.0).abs() < 0.01);
+        assert!(sec.resets_at.is_some());
+
+        let ms = model_specific.expect("model_specific should be present");
+        assert!((ms.used_percent - 10.0).abs() < 0.01);
+        assert!(ms.resets_at.is_some());
+
+        assert!(cost.is_some());
+        assert_eq!(plan_type.as_deref(), Some("Cursor Pro"));
+    }
+
+    #[test]
+    fn test_cursor_build_result_cents_only() {
+        let json = r#"{
+            "billingCycleEnd": "2026-04-01T00:00:00Z",
+            "membershipType": "pro",
+            "individualUsage": {
+                "plan": {
+                    "used": 2500,
+                    "limit": 5000
+                }
+            }
+        }"#;
+
+        let summary = parse_summary(json);
+        let (primary, secondary, model_specific, cost, _, _) =
+            api().build_result(summary, None).unwrap();
+
+        assert!((primary.used_percent - 50.0).abs() < 0.01);
+        assert!(secondary.is_none(), "no autoPercentUsed in payload");
+        assert!(model_specific.is_none(), "no apiPercentUsed in payload");
+        assert!(cost.is_some());
+    }
+
+    #[test]
+    fn test_cursor_build_result_missing_plan() {
+        let json = r#"{
+            "membershipType": "hobby",
+            "individualUsage": {}
+        }"#;
+
+        let summary = parse_summary(json);
+        let (primary, secondary, model_specific, cost, _, _) =
+            api().build_result(summary, None).unwrap();
+
+        assert!((primary.used_percent).abs() < 0.01);
+        assert!(secondary.is_none());
+        assert!(model_specific.is_none());
+        assert!(cost.is_none());
+    }
+
+    #[test]
+    fn test_cursor_on_demand_as_cost() {
+        let json = r#"{
+            "billingCycleEnd": "2026-04-01T00:00:00Z",
+            "membershipType": "pro",
+            "individualUsage": {
+                "plan": {
+                    "used": 800,
+                    "limit": 5000,
+                    "totalPercentUsed": 0.16
+                },
+                "onDemand": {
+                    "enabled": true,
+                    "used": 350,
+                    "limit": 1000
+                }
+            }
+        }"#;
+
+        let summary = parse_summary(json);
+        let (primary, _, _, cost, _, _) = api().build_result(summary, None).unwrap();
+
+        assert!((primary.used_percent - 16.0).abs() < 0.01);
+        let cost = cost.expect("cost should exist from plan usage");
+        assert!((cost.used - 8.0).abs() < 0.01);
+        assert_eq!(cost.limit, Some(50.0));
     }
 }
