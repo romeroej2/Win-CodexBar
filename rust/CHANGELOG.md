@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.5] — 2026-03-29
+
+### Added
+- Windows now loads common Simplified Chinese font fallbacks so localized UI text renders correctly instead of missing glyph boxes.
+
+### Changed
+- Localized major Windows UI surfaces to Simplified Chinese, including the main window, tray menus/tooltips, provider detail actions, and settings sections.
+
+### Fixed
+- Reset/usage/status strings now display correctly in the localized Windows UI instead of mixing untranslated English labels through key flows.
+
+---
+
 ## [1.0.1] — 2026-01-19
 
 ### Added
