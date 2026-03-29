@@ -14,7 +14,7 @@ use super::charts::{
 };
 use super::preferences::PreferencesWindow;
 use super::provider_icons::ProviderIconCache;
-use super::theme::{provider_color, status_color, FontSize, Radius, Spacing, Theme};
+use super::theme::{FontSize, Radius, Spacing, Theme, provider_color, status_color};
 use crate::browser::cookies::get_cookie_header;
 use crate::core::{
     FetchContext, OpenAIDashboardCacheStore, PersonalInfoRedactor, Provider, ProviderFetchResult,
@@ -25,8 +25,8 @@ use crate::cost_scanner::get_daily_cost_history;
 use crate::login::LoginPhase;
 use crate::providers::*;
 use crate::settings::{ApiKeys, ManualCookies, Settings};
-use crate::shortcuts::{parse_shortcut, ShortcutManager};
-use crate::status::{fetch_provider_status, get_status_page_url, StatusLevel};
+use crate::shortcuts::{ShortcutManager, parse_shortcut};
+use crate::status::{StatusLevel, fetch_provider_status, get_status_page_url};
 use crate::tray::{
     LoadingPattern, ProviderUsage, SurpriseAnimation, TrayMenuAction, UnifiedTrayManager,
 };
@@ -34,10 +34,10 @@ use crate::updater::{self, UpdateInfo, UpdateState};
 
 #[cfg(windows)]
 fn restore_main_window() {
-    use windows::core::w;
     use windows::Win32::UI::WindowsAndMessaging::{
-        FindWindowW, IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+        FindWindowW, IsIconic, SW_RESTORE, SW_SHOW, SetForegroundWindow, ShowWindow,
     };
+    use windows::core::w;
 
     unsafe {
         if let Ok(hwnd) = FindWindowW(None, w!("CodexBar")) {
@@ -55,8 +55,8 @@ fn restore_main_window() {
 
 #[cfg(windows)]
 fn show_main_window_no_focus() {
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, SW_SHOWNOACTIVATE, ShowWindow};
     use windows::core::w;
-    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, ShowWindow, SW_SHOWNOACTIVATE};
 
     unsafe {
         if let Ok(hwnd) = FindWindowW(None, w!("CodexBar")) {
@@ -247,11 +247,7 @@ impl ProviderData {
                     sum += v;
                     count += 1;
                 }
-                if count > 0 {
-                    sum / count as f64
-                } else {
-                    0.0
-                }
+                if count > 0 { sum / count as f64 } else { 0.0 }
             }
             crate::settings::MetricPreference::Automatic => {
                 // Automatic: prefer the highest available metric (most concerning)
@@ -468,6 +464,53 @@ pub struct CodexBarApp {
     test_input_queue: super::test_server::TestInputQueue,
 }
 
+fn prepend_font(fonts: &mut FontDefinitions, family: FontFamily, font_name: &str) {
+    let entries = fonts.families.entry(family).or_default();
+    if !entries.iter().any(|existing| existing == font_name) {
+        entries.insert(0, font_name.to_owned());
+    }
+}
+
+fn add_font_if_present(fonts: &mut FontDefinitions, font_name: &str, path: &str) {
+    if let Ok(font_data) = std::fs::read(path) {
+        fonts
+            .font_data
+            .insert(font_name.to_owned(), FontData::from_owned(font_data).into());
+        prepend_font(fonts, FontFamily::Proportional, font_name);
+        prepend_font(fonts, FontFamily::Monospace, font_name);
+    }
+}
+
+#[cfg(windows)]
+fn cjk_font_candidates() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("msyh", "C:\\Windows\\Fonts\\msyh.ttc"),
+        ("msyhbd", "C:\\Windows\\Fonts\\msyhbd.ttc"),
+        ("simsun", "C:\\Windows\\Fonts\\simsun.ttc"),
+        ("simhei", "C:\\Windows\\Fonts\\simhei.ttf"),
+        ("deng", "C:\\Windows\\Fonts\\Deng.ttf"),
+        (
+            "wqy_zenhei",
+            "Z:\\usr\\share\\fonts\\truetype\\wqy\\wqy-zenhei.ttc",
+        ),
+        (
+            "droid_fallback",
+            "Z:\\usr\\share\\fonts\\truetype\\droid\\DroidSansFallbackFull.ttf",
+        ),
+    ]
+}
+
+#[cfg(not(windows))]
+fn cjk_font_candidates() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("wqy_zenhei", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+        (
+            "droid_fallback",
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+        ),
+    ]
+}
+
 impl CodexBarApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // Load Windows symbol + CJK fallback fonts so Chinese UI text renders correctly.
@@ -486,29 +529,8 @@ impl CodexBarApp {
 
         // Add common Chinese fonts in priority order (if present).
         // We insert them at the front so CJK glyph lookup hits these first.
-        let cjk_candidates = [
-            ("msyh", "C:\\Windows\\Fonts\\msyh.ttc"),
-            ("msyhbd", "C:\\Windows\\Fonts\\msyhbd.ttc"),
-            ("simsun", "C:\\Windows\\Fonts\\simsun.ttc"),
-            ("simhei", "C:\\Windows\\Fonts\\simhei.ttf"),
-            ("deng", "C:\\Windows\\Fonts\\Deng.ttf"),
-        ];
-        for (name, path) in cjk_candidates {
-            if let Ok(font_data) = std::fs::read(path) {
-                fonts
-                    .font_data
-                    .insert(name.to_owned(), FontData::from_owned(font_data).into());
-                fonts
-                    .families
-                    .entry(FontFamily::Proportional)
-                    .or_default()
-                    .insert(0, name.to_owned());
-                fonts
-                    .families
-                    .entry(FontFamily::Monospace)
-                    .or_default()
-                    .insert(0, name.to_owned());
-            }
+        for (name, path) in cjk_font_candidates() {
+            add_font_if_present(&mut fonts, name, path);
         }
         cc.egui_ctx.set_fonts(fonts);
 
@@ -550,26 +572,28 @@ impl CodexBarApp {
         let tray_action_rx = if tray_manager.is_some() {
             let (tx, rx) = mpsc::channel::<TrayMenuAction>();
             let repaint_ctx = cc.egui_ctx.clone();
-            std::thread::spawn(move || loop {
-                if let Some(action) = UnifiedTrayManager::check_events() {
-                    if matches!(action, TrayMenuAction::Open | TrayMenuAction::Refresh) {
-                        // Egui viewport commands alone can be ignored while minimized.
-                        // Force a native restore first so the update loop wakes up.
-                        restore_main_window();
-                        repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
-                        repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-                    } else if matches!(action, TrayMenuAction::Settings) {
-                        // Show main window so update() runs (needed to spawn the
-                        // settings child viewport), but don't steal focus.
-                        show_main_window_no_focus();
-                        repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            std::thread::spawn(move || {
+                loop {
+                    if let Some(action) = UnifiedTrayManager::check_events() {
+                        if matches!(action, TrayMenuAction::Open | TrayMenuAction::Refresh) {
+                            // Egui viewport commands alone can be ignored while minimized.
+                            // Force a native restore first so the update loop wakes up.
+                            restore_main_window();
+                            repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+                            repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                        } else if matches!(action, TrayMenuAction::Settings) {
+                            // Show main window so update() runs (needed to spawn the
+                            // settings child viewport), but don't steal focus.
+                            show_main_window_no_focus();
+                            repaint_ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                        }
+                        if tx.send(action).is_err() {
+                            break;
+                        }
+                        repaint_ctx.request_repaint();
+                    } else {
+                        std::thread::sleep(Duration::from_millis(50));
                     }
-                    if tx.send(action).is_err() {
-                        break;
-                    }
-                    repaint_ctx.request_repaint();
-                } else {
-                    std::thread::sleep(Duration::from_millis(50));
                 }
             });
             Some(rx)
@@ -969,7 +993,7 @@ fn work_area_rect(ctx: &egui::Context) -> Option<Rect> {
     {
         use windows::Win32::Foundation::RECT as WinRect;
         use windows::Win32::UI::WindowsAndMessaging::{
-            SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+            SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
         };
 
         let mut rect = WinRect::default();
@@ -1910,7 +1934,7 @@ fn draw_provider_detail_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(16.0); // Right padding
-                                            // Email - .subheadline, secondary color (redacted if privacy mode enabled)
+                        // Email - .subheadline, secondary color (redacted if privacy mode enabled)
                         if let Some(account) = &provider.account {
                             let display_account = PersonalInfoRedactor::redact_email(
                                 Some(account.as_str()),
@@ -1948,7 +1972,7 @@ fn draw_provider_detail_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(16.0); // Right padding
-                                            // Plan badge - .footnote, secondary
+                        // Plan badge - .footnote, secondary
                         if let Some(plan) = &provider.plan {
                             ui.label(
                                 RichText::new(plan)
