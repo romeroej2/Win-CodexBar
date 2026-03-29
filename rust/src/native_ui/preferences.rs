@@ -40,13 +40,13 @@ pub enum PreferencesTab {
 impl PreferencesTab {
     fn label(&self) -> &'static str {
         match self {
-            PreferencesTab::General => "General",
-            PreferencesTab::Providers => "Providers",
-            PreferencesTab::Display => "Display",
-            PreferencesTab::ApiKeys => "API Keys",
+            PreferencesTab::General => "通用",
+            PreferencesTab::Providers => "服务商",
+            PreferencesTab::Display => "显示",
+            PreferencesTab::ApiKeys => "API 密钥",
             PreferencesTab::Cookies => "Cookies",
-            PreferencesTab::Advanced => "Advanced",
-            PreferencesTab::About => "About",
+            PreferencesTab::Advanced => "高级",
+            PreferencesTab::About => "关于",
         }
     }
 
@@ -300,7 +300,7 @@ impl PreferencesWindow {
         };
 
         let mut builder = egui::ViewportBuilder::default()
-            .with_title("CodexBar Settings")
+            .with_title("CodexBar 设置")
             .with_inner_size([settings_size.x, settings_size.y])
             .with_min_inner_size([settings_min_size.x, settings_min_size.y])
             .with_clamp_size_to_monitor_size(true)
@@ -360,8 +360,8 @@ impl PreferencesWindow {
             let mut start_at_login = self.settings.start_at_login;
             if setting_toggle(
                 ui,
-                "Start at login",
-                "Launch CodexBar when you log in",
+                "开机启动",
+                "登录后自动启动 CodexBar",
                 &mut start_at_login,
             ) {
                 if let Err(e) = self.settings.set_start_at_login(start_at_login) {
@@ -376,8 +376,8 @@ impl PreferencesWindow {
             let mut start_minimized = self.settings.start_minimized;
             if setting_toggle(
                 ui,
-                "Start minimized",
-                "Start in the system tray",
+                "最小化启动",
+                "启动后停留在系统托盘",
                 &mut start_minimized,
             ) {
                 self.settings.start_minimized = start_minimized;
@@ -394,8 +394,8 @@ impl PreferencesWindow {
             let mut show_notifications = self.settings.show_notifications;
             if setting_toggle(
                 ui,
-                "Show notifications",
-                "Alert when usage thresholds are reached",
+                "显示通知",
+                "达到用量阈值时提醒",
                 &mut show_notifications,
             ) {
                 self.settings.show_notifications = show_notifications;
@@ -408,8 +408,8 @@ impl PreferencesWindow {
             let mut sound_enabled = self.settings.sound_enabled;
             if setting_toggle(
                 ui,
-                "Sound effects",
-                "Play sound when thresholds are reached",
+                "声音提示",
+                "达到阈值时播放提示音",
                 &mut sound_enabled,
             ) {
                 self.settings.sound_enabled = sound_enabled;
@@ -426,7 +426,7 @@ impl PreferencesWindow {
                     // Title row with volume badge on right
                     ui.horizontal(|ui| {
                         ui.label(
-                            RichText::new("Sound volume")
+                            RichText::new("提示音音量")
                                 .size(FontSize::MD)
                                 .color(Theme::TEXT_PRIMARY),
                         );
@@ -448,7 +448,7 @@ impl PreferencesWindow {
 
                     ui.add_space(2.0);
                     ui.label(
-                        RichText::new("Volume level for alert sounds")
+                        RichText::new("告警提示音音量")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_MUTED),
                     );
@@ -480,7 +480,7 @@ impl PreferencesWindow {
                 // Title row with percentage badge on right
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("High warning")
+                        RichText::new("高位预警")
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
@@ -503,7 +503,7 @@ impl PreferencesWindow {
 
                 ui.add_space(2.0);
                 ui.label(
-                    RichText::new("Show warning at this usage level")
+                    RichText::new("在该用量水平显示预警")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -536,7 +536,7 @@ impl PreferencesWindow {
                 // Title row with percentage badge on right
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("Critical alert")
+                        RichText::new("严重告警")
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
@@ -559,7 +559,7 @@ impl PreferencesWindow {
 
                 ui.add_space(2.0);
                 ui.label(
-                    RichText::new("Show critical alert at this level")
+                    RichText::new("在该水平显示严重告警")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -867,13 +867,13 @@ impl PreferencesWindow {
         settings_card(ui, |ui| {
             // Authentication type
             let auth_type = match provider_name {
-                "openai" | "gemini" | "openrouter" => "API Key",
-                "claude" | "cursor" | "kimi" => "Browser Session",
-                "ollama" => "Local (No Auth)",
-                "windsurf" => "Browser Session",
-                _ => "Browser Session",
+                "openai" | "gemini" | "openrouter" => "API 密钥",
+                "claude" | "cursor" | "kimi" => "浏览器会话",
+                "ollama" => "本地运行（无需认证）",
+                "windsurf" => "浏览器会话",
+                _ => "浏览器会话",
             };
-            self.draw_info_row(ui, "Authentication", auth_type);
+            self.draw_info_row(ui, "认证方式", auth_type);
             setting_divider(ui);
 
             // Data source
@@ -888,18 +888,18 @@ impl PreferencesWindow {
                 "kimi" => "Kimi Web Console",
                 _ => "Provider API",
             };
-            self.draw_info_row(ui, "Data Source", data_source);
+            self.draw_info_row(ui, "数据来源", data_source);
             setting_divider(ui);
 
             // Rate limit info
             let rate_info = match provider_name {
-                "claude" => "Daily message limit",
-                "cursor" => "Monthly request limit",
-                "openai" => "Token usage & credits",
-                "gemini" => "Requests per minute",
-                _ => "Usage tracking",
+                "claude" => "每日消息上限",
+                "cursor" => "每月请求上限",
+                "openai" => "Token 用量与额度",
+                "gemini" => "每分钟请求数",
+                _ => "用量追踪",
             };
-            self.draw_info_row(ui, "Tracks", rate_info);
+            self.draw_info_row(ui, "追踪项", rate_info);
         });
 
         ui.add_space(Spacing::LG);
@@ -916,12 +916,12 @@ impl PreferencesWindow {
                     ui.add_space(Spacing::SM);
                     ui.vertical(|ui| {
                         ui.label(
-                            RichText::new("Live usage data in main window")
+                            RichText::new("主窗口实时用量数据")
                                 .size(FontSize::MD)
                                 .color(Theme::TEXT_PRIMARY),
                         );
                         ui.label(
-                            RichText::new("Click the tray icon to view real-time metrics")
+                            RichText::new("点击托盘图标查看实时指标")
                                 .size(FontSize::SM)
                                 .color(Theme::TEXT_MUTED),
                         );
@@ -937,12 +937,12 @@ impl PreferencesWindow {
                     ui.add_space(Spacing::SM);
                     ui.vertical(|ui| {
                         ui.label(
-                            RichText::new("Provider disabled")
+                            RichText::new("服务商已禁用")
                                 .size(FontSize::MD)
                                 .color(Theme::TEXT_MUTED),
                         );
                         ui.label(
-                            RichText::new("Enable to start tracking usage")
+                            RichText::new("启用后开始追踪用量")
                                 .size(FontSize::SM)
                                 .color(Theme::TEXT_DIM),
                         );
@@ -970,35 +970,35 @@ impl PreferencesWindow {
             // Provider-specific quick actions
             match provider_name {
                 "openai" => {
-                    if text_button(ui, "→ Open OpenAI Dashboard", Theme::ACCENT_PRIMARY) {
+                    if text_button(ui, "→ 打开 OpenAI 仪表盘", Theme::ACCENT_PRIMARY) {
                         let _ = open::that("https://platform.openai.com/usage");
                     }
                 }
                 "claude" => {
-                    if text_button(ui, "→ Open Claude Console", Theme::ACCENT_PRIMARY) {
+                    if text_button(ui, "→ 打开 Claude 控制台", Theme::ACCENT_PRIMARY) {
                         let _ = open::that("https://console.anthropic.com/");
                     }
                 }
                 "gemini" => {
-                    if text_button(ui, "→ Open Google AI Studio", Theme::ACCENT_PRIMARY) {
+                    if text_button(ui, "→ 打开 Google AI Studio", Theme::ACCENT_PRIMARY) {
                         let _ = open::that("https://aistudio.google.com/");
                     }
                 }
                 "cursor" => {
-                    if text_button(ui, "→ Open Cursor Settings", Theme::ACCENT_PRIMARY) {
+                    if text_button(ui, "→ 打开 Cursor 设置", Theme::ACCENT_PRIMARY) {
                         let _ = open::that("https://www.cursor.com/settings");
                     }
                 }
                 "ollama" => {
                     ui.label(
-                        RichText::new("Ollama runs locally - no dashboard")
+                        RichText::new("Ollama 在本地运行，无仪表盘")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_MUTED),
                     );
                 }
                 _ => {
                     ui.label(
-                        RichText::new("No quick actions available")
+                        RichText::new("暂无可用快捷操作")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_MUTED),
                     );
@@ -1031,7 +1031,7 @@ impl PreferencesWindow {
             let domain = provider_id.cookie_domain().unwrap_or("unknown");
 
             ui.label(
-                RichText::new(format!("Import cookies from your browser for {}", domain))
+                RichText::new(format!("从浏览器导入 {} 的 Cookies", domain))
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -1043,7 +1043,7 @@ impl PreferencesWindow {
 
             if browsers.is_empty() {
                 ui.label(
-                    RichText::new("No supported browsers detected")
+                    RichText::new("未检测到受支持的浏览器")
                         .size(FontSize::SM)
                         .color(Theme::YELLOW),
                 );
@@ -1060,7 +1060,7 @@ impl PreferencesWindow {
                         let selected_text = self
                             .selected_browser
                             .map(|b| b.display_name())
-                            .unwrap_or("Select browser...");
+                            .unwrap_or("请选择浏览器...");
 
                         egui::ComboBox::from_id_salt("browser_select")
                             .selected_text(selected_text)
@@ -1090,7 +1090,7 @@ impl PreferencesWindow {
                     .add_enabled(
                         can_import,
                         egui::Button::new(
-                            RichText::new("Import Cookies").size(FontSize::SM).color(
+                            RichText::new("导入 Cookies").size(FontSize::SM).color(
                                 if can_import {
                                     Color32::WHITE
                                 } else {
@@ -1121,11 +1121,11 @@ impl PreferencesWindow {
                                     self.cookies.set(provider_id.cli_name(), &cookie_header);
                                     if let Err(e) = self.cookies.save() {
                                         self.browser_import_status =
-                                            Some((format!("Failed to save: {}", e), true));
+                                            Some((format!("保存失败：{}", e), true));
                                     } else {
                                         self.browser_import_status = Some((
                                             format!(
-                                                "Cookies imported for {}",
+                                                "已为 {} 导入 Cookies",
                                                 provider_id.display_name()
                                             ),
                                             false,
@@ -1134,18 +1134,18 @@ impl PreferencesWindow {
                                 }
                                 Ok(_) => {
                                     self.browser_import_status = Some((
-                                        format!("No cookies found for {} in {}. Make sure you're logged in.", domain, browser_type.display_name()),
+                                        format!("在 {} 的 {} 中未找到 Cookies。请先确认已登录。", browser_type.display_name(), domain),
                                         true
                                     ));
                                 }
                                 Err(e) => {
                                     self.browser_import_status =
-                                        Some((format!("Import failed: {}", e), true));
+                                        Some((format!("导入失败：{}", e), true));
                                 }
                             }
                         } else {
                             self.browser_import_status = Some((
-                                format!("Browser {} not found", browser_type.display_name()),
+                                format!("未找到浏览器 {}", browser_type.display_name()),
                                 true,
                             ));
                         }
@@ -1169,8 +1169,8 @@ impl PreferencesWindow {
             let mut show_as_used = self.settings.show_as_used;
             if setting_toggle(
                 ui,
-                "Show usage as used",
-                "Show usage as percentage used (vs remaining)",
+                "按已使用显示用量",
+                "显示为已使用百分比（而非剩余）",
                 &mut show_as_used,
             ) {
                 self.settings.show_as_used = show_as_used;
@@ -1182,8 +1182,8 @@ impl PreferencesWindow {
             let mut reset_time_relative = self.settings.reset_time_relative;
             if setting_toggle(
                 ui,
-                "Relative reset times",
-                "Show '2h 30m' instead of '3:00 PM'",
+                "相对重置时间",
+                "显示“2h 30m”而不是“3:00 PM”",
                 &mut reset_time_relative,
             ) {
                 self.settings.reset_time_relative = reset_time_relative;
@@ -1195,8 +1195,8 @@ impl PreferencesWindow {
             let mut show_credits_extra = self.settings.show_credits_extra_usage;
             if setting_toggle(
                 ui,
-                "Show credits + extra usage",
-                "Display credit balance and extra usage information",
+                "显示额度与扩展用量",
+                "显示额度余额和额外用量信息",
                 &mut show_credits_extra,
             ) {
                 self.settings.show_credits_extra_usage = show_credits_extra;
@@ -1212,8 +1212,8 @@ impl PreferencesWindow {
             let mut merge_icons = self.settings.merge_tray_icons;
             if setting_toggle(
                 ui,
-                "Merge tray icons",
-                "Show all providers in a single tray icon",
+                "合并托盘图标",
+                "将所有服务商显示在一个托盘图标中",
                 &mut merge_icons,
             ) {
                 self.settings.merge_tray_icons = merge_icons;
@@ -1225,8 +1225,8 @@ impl PreferencesWindow {
             let mut per_provider = self.settings.tray_icon_mode == TrayIconMode::PerProvider;
             if setting_toggle(
                 ui,
-                "Per-provider icons",
-                "Show a separate tray icon for each enabled provider",
+                "按服务商分图标",
+                "每个启用的服务商显示独立托盘图标",
                 &mut per_provider,
             ) {
                 self.settings.tray_icon_mode = if per_provider {
@@ -1243,7 +1243,7 @@ impl PreferencesWindow {
         section_header(ui, "API Keys");
 
         ui.label(
-            RichText::new("Configure access tokens for providers that require authentication.")
+            RichText::new("为需要认证的服务商配置访问令牌。")
                 .size(FontSize::SM)
                 .color(Theme::TEXT_MUTED),
         );
@@ -1323,7 +1323,7 @@ impl PreferencesWindow {
                                         .inner_margin(egui::Margin::symmetric(Spacing::XS, 2.0))
                                         .show(ui, |ui| {
                                             ui.label(
-                                                RichText::new("Needs key")
+                                                RichText::new("需要密钥")
                                                     .size(FontSize::XS)
                                                     .color(Color32::BLACK),
                                             );
@@ -1336,7 +1336,7 @@ impl PreferencesWindow {
                                     |ui| {
                                         ui.add_space(Spacing::XS);
                                         if !has_key {
-                                            if primary_button(ui, "+ Add Key") {
+                                            if primary_button(ui, "+ 添加密钥") {
                                                 self.new_api_key_provider = provider_id.to_string();
                                                 self.show_api_key_input = true;
                                                 self.new_api_key_value.clear();
@@ -1353,7 +1353,7 @@ impl PreferencesWindow {
                                 // Env var info
                                 if let Some(env_var) = provider_info.api_key_env_var {
                                     ui.label(
-                                        RichText::new(format!("Env: {}", env_var))
+                                        RichText::new(format!("环境变量：{}", env_var))
                                             .size(FontSize::XS)
                                             .color(Theme::TEXT_MUTED)
                                             .monospace(),
@@ -1386,7 +1386,7 @@ impl PreferencesWindow {
                                                 let _ = self.api_keys.save();
                                                 self.api_key_status_msg = Some((
                                                     format!(
-                                                        "Removed API key for {}",
+                                                        "已移除 {} 的 API key",
                                                         provider_info.name
                                                     ),
                                                     false,
@@ -1436,7 +1436,7 @@ impl PreferencesWindow {
                 .inner_margin(Spacing::LG)
                 .show(ui, |ui| {
                     ui.label(
-                        RichText::new(format!("Enter API Key for {}", provider_name))
+                        RichText::new(format!("为 {} 输入 API Key", provider_name))
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY)
                             .strong(),
@@ -1447,7 +1447,7 @@ impl PreferencesWindow {
                     let text_edit = egui::TextEdit::singleline(&mut self.new_api_key_value)
                         .password(true)
                         .desired_width(ui.available_width())
-                        .hint_text("Paste your API key here...");
+                        .hint_text("在这里粘贴 API key...");
                     ui.add(text_edit);
 
                     ui.add_space(Spacing::MD);
@@ -1459,7 +1459,7 @@ impl PreferencesWindow {
                             .add_enabled(
                                 can_save,
                                 egui::Button::new(
-                                    RichText::new("Save")
+                                    RichText::new("保存")
                                         .size(FontSize::SM)
                                         .color(Color32::WHITE),
                                 )
@@ -1480,10 +1480,10 @@ impl PreferencesWindow {
                             );
                             if let Err(e) = self.api_keys.save() {
                                 self.api_key_status_msg =
-                                    Some((format!("Failed to save: {}", e), true));
+                                    Some((format!("保存失败：{}", e), true));
                             } else {
                                 self.api_key_status_msg =
-                                    Some((format!("API key saved for {}", provider_name), false));
+                                    Some((format!("已保存 {} 的 API key", provider_name), false));
                                 self.show_api_key_input = false;
                                 self.new_api_key_value.clear();
                             }
@@ -1494,7 +1494,7 @@ impl PreferencesWindow {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    RichText::new("Cancel")
+                                    RichText::new("取消")
                                         .size(FontSize::SM)
                                         .color(Theme::TEXT_MUTED),
                                 )
@@ -1517,7 +1517,7 @@ impl PreferencesWindow {
 
         ui.label(
             RichText::new(
-                "Cookies are automatically extracted from Chrome, Edge, Brave, and Firefox.",
+                "Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。",
             )
             .size(FontSize::SM)
             .color(Theme::TEXT_MUTED),
@@ -1570,7 +1570,7 @@ impl PreferencesWindow {
                     self.cookies.remove(&provider_id);
                     let _ = self.cookies.save();
                     self.cookie_status_msg =
-                        Some((format!("Removed cookie for {}", provider_id), false));
+                        Some((format!("已移除 {} 的 Cookie", provider_id), false));
                 }
             });
 
@@ -1584,14 +1584,14 @@ impl PreferencesWindow {
             // Provider selection row
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("Provider")
+                    RichText::new("服务商")
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::ComboBox::from_id_salt("cookie_provider")
                         .selected_text(if self.new_cookie_provider.is_empty() {
-                            "Select..."
+                            "请选择..."
                         } else {
                             &self.new_cookie_provider
                         })
@@ -1620,7 +1620,7 @@ impl PreferencesWindow {
 
             // Cookie header label
             ui.label(
-                RichText::new("Cookie header")
+                RichText::new("Cookie 头")
                     .size(FontSize::MD)
                     .color(Theme::TEXT_PRIMARY),
             );
@@ -1637,7 +1637,7 @@ impl PreferencesWindow {
                         .desired_width(ui.available_width())
                         .desired_rows(4)
                         .frame(false)
-                        .hint_text("Paste cookie header from browser dev tools");
+                        .hint_text("粘贴浏览器开发者工具中的 Cookie 头");
                     ui.add(text_edit);
                 });
 
@@ -1650,7 +1650,7 @@ impl PreferencesWindow {
             if ui
                 .add_enabled(
                     can_save,
-                    egui::Button::new(RichText::new("Save Cookie").size(FontSize::SM).color(
+                    egui::Button::new(RichText::new("保存 Cookie").size(FontSize::SM).color(
                         if can_save {
                             Color32::WHITE
                         } else {
@@ -1675,13 +1675,13 @@ impl PreferencesWindow {
                 self.cookies
                     .set(&self.new_cookie_provider, &self.new_cookie_value);
                 if let Err(e) = self.cookies.save() {
-                    self.cookie_status_msg = Some((format!("Failed to save: {}", e), true));
+                    self.cookie_status_msg = Some((format!("保存失败：{}", e), true));
                 } else {
                     let provider_name = ProviderId::from_cli_name(&self.new_cookie_provider)
                         .map(|id| id.display_name().to_string())
                         .unwrap_or_else(|| self.new_cookie_provider.clone());
                     self.cookie_status_msg =
-                        Some((format!("Cookie saved for {}", provider_name), false));
+                        Some((format!("已保存 {} 的 Cookie", provider_name), false));
                     self.new_cookie_provider.clear();
                     self.new_cookie_value.clear();
                 }
@@ -1696,12 +1696,12 @@ impl PreferencesWindow {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label(
-                        RichText::new("Auto-refresh interval")
+                        RichText::new("自动刷新间隔")
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
                     ui.label(
-                        RichText::new("How often to fetch usage data")
+                        RichText::new("获取用量数据的频率")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_MUTED),
                     );
@@ -1709,7 +1709,7 @@ impl PreferencesWindow {
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let intervals = [
-                        (0, "Manual"),
+                        (0, "手动"),
                         (60, "1 min"),
                         (120, "2 min"),
                         (300, "5 min"),
@@ -1777,12 +1777,12 @@ impl PreferencesWindow {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label(
-                        RichText::new("Display mode")
+                        RichText::new("显示模式")
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
                     ui.label(
-                        RichText::new("How much detail to show in menu bar")
+                        RichText::new("菜单栏显示的详细程度")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_MUTED),
                     );
@@ -1872,7 +1872,7 @@ impl PreferencesWindow {
             );
 
             ui.label(
-                RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION")))
+                RichText::new(format!("版本 {}", env!("CARGO_PKG_VERSION")))
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -1882,12 +1882,12 @@ impl PreferencesWindow {
 
         ui.vertical_centered(|ui| {
             ui.label(
-                RichText::new("A Windows port of the macOS CodexBar app.")
+                RichText::new("CodexBar 的 Windows 移植版本。")
                     .size(FontSize::MD)
                     .color(Theme::TEXT_SECONDARY),
             );
             ui.label(
-                RichText::new("Track your AI provider usage from the system tray.")
+                RichText::new("在系统托盘中追踪 AI 服务商用量。")
                     .size(FontSize::MD)
                     .color(Theme::TEXT_SECONDARY),
             );
@@ -1901,7 +1901,7 @@ impl PreferencesWindow {
                     let _ = open::that("https://github.com/Finesssee/Win-CodexBar");
                 }
                 ui.label(RichText::new("·").color(Theme::TEXT_DIM));
-                if ui.link("Original macOS Version").clicked() {
+                if ui.link("原始 macOS 版本").clicked() {
                     let _ = open::that("https://github.com/steipete/CodexBar");
                 }
             });
@@ -1913,7 +1913,7 @@ impl PreferencesWindow {
             if ui
                 .add(
                     egui::Button::new(
-                        RichText::new("Check for Updates")
+                        RichText::new("检查更新")
                             .size(FontSize::SM)
                             .color(Theme::TEXT_PRIMARY),
                     )
@@ -1931,7 +1931,7 @@ impl PreferencesWindow {
 
         ui.vertical_centered(|ui| {
             ui.label(
-                RichText::new("Built with Rust + egui")
+                RichText::new("基于 Rust + egui 构建")
                     .size(FontSize::XS)
                     .color(Theme::TEXT_DIM),
             );
@@ -2585,14 +2585,14 @@ fn render_provider_detail_panel(
         if diff.num_seconds() < 60 {
             "Updated just now".to_string()
         } else if diff.num_minutes() < 60 {
-            format!("Updated {}m ago", diff.num_minutes())
+            format!("{} 分钟前更新", diff.num_minutes())
         } else if diff.num_hours() < 24 {
-            format!("Updated {}h ago", diff.num_hours())
+            format!("{} 小时前更新", diff.num_hours())
         } else {
-            format!("Updated {}d ago", diff.num_days())
+            format!("{} 天前更新", diff.num_days())
         }
     } else {
-        "Never updated".to_string()
+        "从未更新".to_string()
     };
     let hide_personal_info = if let Ok(state) = shared_state.lock() {
         state.settings.hide_personal_info
@@ -2675,7 +2675,7 @@ fn render_provider_detail_panel(
         let reset_str = format_reset(rate);
         usage_bar_row(
             ui,
-            "Session",
+            "会话",
             percent as f32,
             &label,
             reset_str.as_deref(),
@@ -2690,7 +2690,7 @@ fn render_provider_detail_panel(
         let reset_str = format_reset(rate);
         usage_bar_row(
             ui,
-            "Weekly",
+            "周度",
             percent as f32,
             &label,
             reset_str.as_deref(),
@@ -2858,7 +2858,7 @@ fn render_provider_detail_panel(
     // Menu bar metric dropdown
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Menu bar metric")
+            RichText::new("菜单栏指标")
                 .size(FontSize::SM)
                 .color(Theme::TEXT_SECONDARY),
         );
@@ -2869,15 +2869,15 @@ fn render_provider_detail_panel(
                 .width(120.0)
                 .show_ui(ui, |ui| {
                     let _ = ui.selectable_label(true, "Automatic");
-                    let _ = ui.selectable_label(false, "Session");
-                    let _ = ui.selectable_label(false, "Weekly");
+                    let _ = ui.selectable_label(false, "会话");
+                    let _ = ui.selectable_label(false, "周度");
                 });
         });
     });
 
     ui.add_space(4.0);
     ui.label(
-        RichText::new("Choose which window drives the menu bar percent.")
+        RichText::new("选择由哪个时间窗口驱动菜单栏百分比。")
             .size(FontSize::XS)
             .color(Theme::TEXT_MUTED),
     );
@@ -2887,7 +2887,7 @@ fn render_provider_detail_panel(
     // Usage source dropdown
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Usage source")
+            RichText::new("用量来源")
                 .size(FontSize::SM)
                 .color(Theme::TEXT_SECONDARY),
         );
@@ -3003,9 +3003,9 @@ fn usage_display(used_percent: f64, show_as_used: bool) -> (f64, String) {
     };
 
     let label = if show_as_used {
-        format!("{:.0}% used", display_percent)
+        format!("已使用 {:.0}%", display_percent)
     } else {
-        format!("{:.0}% remaining", display_percent)
+        format!("剩余 {:.0}%", display_percent)
     };
 
     (display_percent, label)
@@ -3078,10 +3078,10 @@ fn render_accounts_section(
                         let store = TokenAccountStore::new();
                         if let Err(e) = store.save(&state.token_accounts) {
                             state.token_account_status_msg =
-                                Some((format!("Failed to save: {}", e), true));
+                                Some((format!("保存失败：{}", e), true));
                         } else {
                             state.token_account_status_msg =
-                                Some(("Account switched".to_string(), false));
+                                Some(("已切换账号".to_string(), false));
                         }
                     }
                 }
@@ -3124,10 +3124,10 @@ fn render_accounts_section(
                             let store = TokenAccountStore::new();
                             if let Err(e) = store.save(&state.token_accounts) {
                                 state.token_account_status_msg =
-                                    Some((format!("Failed to save: {}", e), true));
+                                    Some((format!("保存失败：{}", e), true));
                             } else {
                                 state.token_account_status_msg =
-                                    Some(("Account removed".to_string(), false));
+                                    Some(("已移除账号".to_string(), false));
                             }
                         }
                     }
@@ -3246,10 +3246,10 @@ fn render_accounts_section(
                             let store = TokenAccountStore::new();
                             if let Err(e) = store.save(&state.token_accounts) {
                                 state.token_account_status_msg =
-                                    Some((format!("Failed to save: {}", e), true));
+                                    Some((format!("保存失败：{}", e), true));
                             } else {
                                 state.token_account_status_msg =
-                                    Some(("Account added".to_string(), false));
+                                    Some(("已添加账号".to_string(), false));
                                 state.new_account_label.clear();
                                 state.new_account_token.clear();
                                 state.show_add_account_input = false;
@@ -3306,8 +3306,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Start at login",
-            "Launch CodexBar when you log in",
+            "开机启动",
+            "登录后自动启动 CodexBar",
             &mut start_at_login,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3329,8 +3329,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Start minimized",
-            "Start in the system tray",
+            "最小化启动",
+            "启动后停留在系统托盘",
             &mut start_minimized,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3353,8 +3353,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Show notifications",
-            "Alert when usage thresholds are reached",
+            "显示通知",
+            "达到用量阈值时提醒",
             &mut show_notifications,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3374,8 +3374,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Sound effects",
-            "Play sound when thresholds are reached",
+            "声音提示",
+            "达到阈值时播放提示音",
             &mut sound_enabled,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3398,7 +3398,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 // Title row with volume badge on right
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("Sound volume")
+                        RichText::new("提示音音量")
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
@@ -3420,7 +3420,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
                 ui.add_space(2.0);
                 ui.label(
-                    RichText::new("Volume level for alert sounds")
+                    RichText::new("告警提示音音量")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -3456,7 +3456,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("High warning")
+                    RichText::new("高位预警")
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3478,7 +3478,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("Show warning at this usage level")
+                RichText::new("在该用量水平显示预警")
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -3515,7 +3515,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("Critical alert")
+                    RichText::new("严重告警")
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3537,7 +3537,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("Show critical alert at this level")
+                RichText::new("在该水平显示严重告警")
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -3573,8 +3573,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Hide personal info",
-            "Mask emails and account names (useful for streaming)",
+            "隐藏个人信息",
+            "遮蔽邮箱和账号名称（适合直播时使用）",
             &mut hide_personal_info,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3592,12 +3592,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("Update channel")
+                    RichText::new("更新通道")
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("Choose between stable releases or beta previews")
+                    RichText::new("在稳定版与测试预览版之间选择")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -3654,12 +3654,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("Global shortcut")
+                    RichText::new("全局快捷键")
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("Press this key combination to open CodexBar from anywhere")
+                    RichText::new("按下此快捷键可在任意位置打开 CodexBar")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -3789,7 +3789,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
     section_header(ui, "API Keys");
 
     ui.label(
-        RichText::new("Configure access tokens for providers that require authentication.")
+        RichText::new("为需要认证的服务商配置访问令牌。")
             .size(FontSize::SM)
             .color(Theme::TEXT_MUTED),
     );
@@ -3904,7 +3904,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                                     .inner_margin(egui::Margin::symmetric(Spacing::XS, 2.0))
                                     .show(ui, |ui| {
                                         ui.label(
-                                            RichText::new("Needs key")
+                                            RichText::new("需要密钥")
                                                 .size(FontSize::XS)
                                                 .color(Color32::BLACK),
                                         );
@@ -3917,7 +3917,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                                 |ui| {
                                     ui.add_space(Spacing::XS);
                                     if !has_key {
-                                        if primary_button(ui, "+ Add Key") {
+                                        if primary_button(ui, "+ 添加密钥") {
                                             if let Ok(mut state) = shared_state.lock() {
                                                 state.new_api_key_provider =
                                                     provider_id.to_string();
@@ -3936,7 +3936,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
 
                             if let Some(env_var) = provider_info.api_key_env_var {
                                 ui.label(
-                                    RichText::new(format!("Env: {}", env_var))
+                                    RichText::new(format!("环境变量：{}", env_var))
                                         .size(FontSize::XS)
                                         .color(Theme::TEXT_MUTED)
                                         .monospace(),
@@ -3968,7 +3968,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                                                 let _ = state.api_keys.save();
                                                 state.api_key_status_msg = Some((
                                                     format!(
-                                                        "Removed API key for {}",
+                                                        "已移除 {} 的 API key",
                                                         provider_info.name
                                                     ),
                                                     false,
@@ -4016,7 +4016,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
             .inner_margin(Spacing::LG)
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("Enter API Key for {}", provider_name))
+                    RichText::new(format!("为 {} 输入 API Key", provider_name))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY)
                         .strong(),
@@ -4034,7 +4034,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                 let text_edit = egui::TextEdit::singleline(&mut current_value)
                     .password(true)
                     .desired_width(ui.available_width())
-                    .hint_text("Paste your API key here...");
+                    .hint_text("在这里粘贴 API key...");
                 let response = ui.add(text_edit);
 
                 if response.changed() {
@@ -4072,10 +4072,10 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                             state.api_keys.set(&provider, &value, None);
                             if let Err(e) = state.api_keys.save() {
                                 state.api_key_status_msg =
-                                    Some((format!("Failed to save: {}", e), true));
+                                    Some((format!("保存失败：{}", e), true));
                             } else {
                                 state.api_key_status_msg =
-                                    Some((format!("API key saved for {}", provider_name), false));
+                                    Some((format!("已保存 {} 的 API key", provider_name), false));
                                 state.show_api_key_input = false;
                                 state.new_api_key_value.clear();
                             }
@@ -4112,7 +4112,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
     section_header(ui, "Browser Cookies");
 
     ui.label(
-        RichText::new("Cookies are automatically extracted from Chrome, Edge, Brave, and Firefox.")
+        RichText::new("Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。")
             .size(FontSize::SM)
             .color(Theme::TEXT_MUTED),
     );
@@ -4175,7 +4175,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                     state.cookies.remove(&provider_id);
                     let _ = state.cookies.save();
                     state.cookie_status_msg =
-                        Some((format!("Removed cookie for {}", provider_id), false));
+                        Some((format!("已移除 {} 的 Cookie", provider_id), false));
                 }
             }
         });
@@ -4236,7 +4236,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         // Cookie header label
         ui.label(
-            RichText::new("Cookie header")
+            RichText::new("Cookie 头")
                 .size(FontSize::MD)
                 .color(Theme::TEXT_PRIMARY),
         );
@@ -4287,7 +4287,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         if ui
             .add_enabled(
                 can_save,
-                egui::Button::new(RichText::new("Save Cookie").size(FontSize::SM).color(
+                egui::Button::new(RichText::new("保存 Cookie").size(FontSize::SM).color(
                     if can_save {
                         Color32::WHITE
                     } else {
@@ -4314,13 +4314,13 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 let value = state.new_cookie_value.clone();
                 state.cookies.set(&provider, &value);
                 if let Err(e) = state.cookies.save() {
-                    state.cookie_status_msg = Some((format!("Failed to save: {}", e), true));
+                    state.cookie_status_msg = Some((format!("保存失败：{}", e), true));
                 } else {
                     let provider_name = ProviderId::from_cli_name(&provider)
                         .map(|id| id.display_name().to_string())
                         .unwrap_or_else(|| provider.clone());
                     state.cookie_status_msg =
-                        Some((format!("Cookie saved for {}", provider_name), false));
+                        Some((format!("已保存 {} 的 Cookie", provider_name), false));
                     state.new_cookie_provider.clear();
                     state.new_cookie_value.clear();
                 }
@@ -4336,7 +4336,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("Auto-refresh interval")
+                RichText::new("自动刷新间隔")
                     .size(FontSize::MD)
                     .color(Theme::TEXT_PRIMARY),
             );
@@ -4349,7 +4349,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                 };
 
                 let intervals = [
-                    (0, "Never"),
+                    (0, "从不"),
                     (30, "30 sec"),
                     (60, "1 min"),
                     (300, "5 min"),
@@ -4360,7 +4360,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                     .iter()
                     .find(|(v, _)| *v == current_interval)
                     .map(|(_, l)| *l)
-                    .unwrap_or("Custom");
+                    .unwrap_or("自定义");
 
                 // Style combobox to match theme
                 ui.style_mut().visuals.widgets.inactive.bg_fill = Theme::BG_TERTIARY;
@@ -4414,7 +4414,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
         // Version
         ui.label(
-            RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION")))
+            RichText::new(format!("版本 {}", env!("CARGO_PKG_VERSION")))
                 .size(FontSize::MD)
                 .color(Theme::TEXT_SECONDARY),
         );
@@ -4423,7 +4423,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
         // Tagline
         ui.label(
-            RichText::new("Monitor your AI provider usage limits")
+            RichText::new("监控 AI 服务商用量限制")
                 .size(FontSize::SM)
                 .color(Theme::TEXT_MUTED),
         );
@@ -4436,7 +4436,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
     settings_card(ui, |ui| {
         ui.vertical(|ui| {
             ui.label(
-                RichText::new("Created by CodexBar Contributors")
+                RichText::new("由 CodexBar 贡献者维护")
                     .size(FontSize::SM)
                     .color(Theme::TEXT_PRIMARY),
             );
@@ -4455,11 +4455,11 @@ fn render_about_tab(ui: &mut egui::Ui) {
     section_header(ui, "Links");
     settings_card(ui, |ui| {
         ui.vertical(|ui| {
-            if text_button(ui, "→ View on GitHub", Theme::ACCENT_PRIMARY) {
+            if text_button(ui, "→ 查看 GitHub", Theme::ACCENT_PRIMARY) {
                 let _ = open::that("https://github.com/Finesssee/Win-CodexBar");
             }
             ui.add_space(Spacing::XS);
-            if text_button(ui, "→ Report an Issue", Theme::ACCENT_PRIMARY) {
+            if text_button(ui, "→ 提交问题", Theme::ACCENT_PRIMARY) {
                 let _ = open::that("https://github.com/Finesssee/Win-CodexBar/issues");
             }
         });
@@ -4476,7 +4476,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("Commit:")
+                    RichText::new("提交:")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -4492,7 +4492,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("Built:")
+                    RichText::new("构建:")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -4575,14 +4575,50 @@ fn render_providers_tab(
 
 /// Section header - subtle, uppercase
 fn section_header(ui: &mut egui::Ui, text: &str) {
+    let localized = zh_section_label(text);
+    let display_text = if localized.is_ascii() {
+        localized.to_uppercase()
+    } else {
+        localized.to_string()
+    };
     ui.add_space(Spacing::SM);
     ui.label(
-        RichText::new(text.to_uppercase())
+        RichText::new(display_text)
             .size(FontSize::XS)
             .color(Theme::TEXT_SECTION)
             .strong(),
     );
     ui.add_space(Spacing::MD);
+}
+
+fn zh_section_label(text: &str) -> &str {
+    match text {
+        "Startup" => "启动",
+        "Notifications" => "通知",
+        "Info" => "信息",
+        "Usage" => "用量",
+        "Quick Actions" => "快捷操作",
+        "Browser Cookie Import" => "浏览器 Cookie 导入",
+        "Usage Display" => "用量显示",
+        "Tray Icon" => "托盘图标",
+        "API Keys" => "API 密钥",
+        "Browser Cookies" => "浏览器 Cookie",
+        "Saved Cookies" => "已保存 Cookies",
+        "Add Manual Cookie" => "添加手动 Cookie",
+        "Refresh" => "刷新",
+        "Animations" => "动画",
+        "Menu Bar" => "菜单栏",
+        "Fun" => "趣味",
+        "Privacy" => "隐私",
+        "Updates" => "更新",
+        "Keyboard Shortcuts" => "快捷键",
+        "Appearance" => "外观",
+        "Credits" => "鸣谢",
+        "Links" => "链接",
+        "Build Info" => "构建信息",
+        "Enabled Providers" => "已启用服务商",
+        _ => text,
+    }
 }
 
 /// Settings card container - grouped settings with rounded corners and border

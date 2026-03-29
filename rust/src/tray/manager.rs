@@ -107,14 +107,14 @@ impl TrayManager {
         let menu = Menu::new();
 
         // Open CodexBar
-        let open_item = MenuItem::with_id("open", "Open CodexBar", true, None);
+        let open_item = MenuItem::with_id("open", "打开 CodexBar", true, None);
         menu.append(&open_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Refresh All
-        let refresh_item = MenuItem::with_id("refresh", "Refresh All", true, None);
+        let refresh_item = MenuItem::with_id("refresh", "全部刷新", true, None);
         menu.append(&refresh_item)?;
 
         // Separator
@@ -122,7 +122,7 @@ impl TrayManager {
 
         // Providers submenu with check items
         // Build submenu items first, then add to parent menu to avoid Windows duplication bug
-        let providers_submenu = Submenu::new("Providers", true);
+        let providers_submenu = Submenu::new("服务商", true);
         let mut provider_menu_items = HashMap::new();
         for provider_id in ProviderId::all() {
             let cli_name = provider_id.cli_name();
@@ -139,25 +139,25 @@ impl TrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Settings
-        let settings_item = MenuItem::with_id("settings", "Settings...", true, None);
+        let settings_item = MenuItem::with_id("settings", "设置...", true, None);
         menu.append(&settings_item)?;
 
         // Check for Updates
-        let updates_item = MenuItem::with_id("updates", "Check for Updates", true, None);
+        let updates_item = MenuItem::with_id("updates", "检查更新", true, None);
         menu.append(&updates_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Quit
-        let quit_item = MenuItem::with_id("quit", "Quit", true, None);
+        let quit_item = MenuItem::with_id("quit", "退出", true, None);
         menu.append(&quit_item)?;
 
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
 
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("CodexBar - Loading...")
+            .with_tooltip("CodexBar - 加载中...")
             .with_icon(icon)
             .build()?;
 
@@ -172,7 +172,7 @@ impl TrayManager {
     /// Update the tray icon based on usage percentages (single provider mode)
     pub fn update_usage(&self, session_percent: f64, weekly_percent: f64, provider_name: &str) {
         let tooltip = format!(
-            "{}: Session {}% | Weekly {}%",
+            "{}：会话 {}% | 周度 {}%",
             provider_name, session_percent as i32, weekly_percent as i32
         );
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
@@ -200,14 +200,14 @@ impl TrayManager {
     ) {
         let status_suffix = match overlay {
             IconOverlay::None => "",
-            IconOverlay::Error => " (Error)",
-            IconOverlay::Stale => " (Stale)",
-            IconOverlay::Incident => " (Incident)",
-            IconOverlay::Partial => " (Partial Outage)",
+            IconOverlay::Error => "（错误）",
+            IconOverlay::Stale => "（数据过期）",
+            IconOverlay::Incident => "（故障）",
+            IconOverlay::Partial => "（部分中断）",
         };
 
         let tooltip = format!(
-            "{}: Session {}% | Weekly {}%{}",
+            "{}：会话 {}% | 周度 {}%{}",
             provider_name, session_percent as i32, weekly_percent as i32, status_suffix
         );
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
@@ -242,7 +242,7 @@ impl TrayManager {
         let _ = self.tray_icon.set_icon(Some(icon));
 
         let tooltip = format!(
-            "{}: Session {}% | Weekly {}% (data {}m old)",
+            "{}：会话 {}% | 周度 {}%（数据 {} 分钟前）",
             provider_name, session_percent as i32, weekly_percent as i32, age_minutes
         );
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
@@ -255,7 +255,7 @@ impl TrayManager {
         let _ = self.tray_icon.set_icon(Some(icon));
 
         let tooltip = format!(
-            "{}: Weekly quota exhausted | {:.0}% credits remaining",
+            "{}：周额度已用尽 | 剩余额度 {:.0}%",
             provider_name, credits_percent
         );
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
@@ -266,7 +266,7 @@ impl TrayManager {
         if providers.is_empty() {
             let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
             let _ = self.tray_icon.set_icon(Some(icon));
-            let _ = self.tray_icon.set_tooltip(Some("CodexBar - No providers"));
+            let _ = self.tray_icon.set_tooltip(Some("CodexBar - 无可用服务商"));
             return;
         }
 
@@ -309,7 +309,7 @@ impl TrayManager {
 
         let icon = create_loading_icon(primary, secondary);
         let _ = self.tray_icon.set_icon(Some(icon));
-        let _ = self.tray_icon.set_tooltip(Some("CodexBar - Loading..."));
+        let _ = self.tray_icon.set_tooltip(Some("CodexBar - 加载中..."));
     }
 
     /// Show morph animation on the tray icon (Unbraid effect)
@@ -317,7 +317,7 @@ impl TrayManager {
     pub fn show_morph(&self, progress: f64, session_percent: f64, weekly_percent: f64) {
         let icon = create_morph_icon(progress, session_percent, weekly_percent);
         let _ = self.tray_icon.set_icon(Some(icon));
-        let _ = self.tray_icon.set_tooltip(Some("CodexBar - Loading..."));
+        let _ = self.tray_icon.set_tooltip(Some("CodexBar - 加载中..."));
     }
 
     /// Show a surprise animation frame
@@ -506,13 +506,13 @@ impl MultiTrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Open CodexBar
-        let open_item = MenuItem::with_id("open", "Open CodexBar", true, None);
+        let open_item = MenuItem::with_id("open", "打开 CodexBar", true, None);
         menu.append(&open_item)?;
 
         // Refresh
         let refresh_item = MenuItem::with_id(
             &format!("refresh_{}", provider_id.cli_name()),
-            "Refresh",
+            "刷新",
             true,
             None,
         );
@@ -521,17 +521,17 @@ impl MultiTrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Settings
-        let settings_item = MenuItem::with_id("settings", "Settings...", true, None);
+        let settings_item = MenuItem::with_id("settings", "设置...", true, None);
         menu.append(&settings_item)?;
 
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Quit
-        let quit_item = MenuItem::with_id("quit", "Quit", true, None);
+        let quit_item = MenuItem::with_id("quit", "退出", true, None);
         menu.append(&quit_item)?;
 
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
-        let tooltip = format!("{} - Loading...", provider_id.display_name());
+        let tooltip = format!("{} - 加载中...", provider_id.display_name());
 
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
@@ -565,7 +565,7 @@ impl MultiTrayManager {
             let _ = tray_icon.set_icon(Some(icon));
 
             let tooltip = format!(
-                "{}: Session {}% | Weekly {}%",
+                "{}：会话 {}% | 周度 {}%",
                 provider_id.display_name(),
                 session_percent as i32,
                 weekly_percent as i32
@@ -599,14 +599,14 @@ impl MultiTrayManager {
 
             let status_suffix = match overlay {
                 IconOverlay::None => "",
-                IconOverlay::Error => " (Error)",
-                IconOverlay::Stale => " (Stale)",
-                IconOverlay::Incident => " (Incident)",
-                IconOverlay::Partial => " (Partial Outage)",
+                IconOverlay::Error => "（错误）",
+                IconOverlay::Stale => "（数据过期）",
+                IconOverlay::Incident => "（故障）",
+                IconOverlay::Partial => "（部分中断）",
             };
 
             let tooltip = format!(
-                "{}: Session {}% | Weekly {}%{}",
+                "{}：会话 {}% | 周度 {}%{}",
                 provider_id.display_name(),
                 session_percent as i32,
                 weekly_percent as i32,
@@ -630,7 +630,7 @@ impl MultiTrayManager {
             let icon = create_loading_icon(primary, secondary);
             let _ = tray_icon.set_icon(Some(icon));
             let _ = tray_icon.set_tooltip(Some(&format!(
-                "{} - Loading...",
+                "{} - 加载中...",
                 provider_id.display_name()
             )));
         }
