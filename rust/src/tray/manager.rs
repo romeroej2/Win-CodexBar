@@ -92,6 +92,45 @@ pub struct ProviderUsage {
     pub weekly_percent: f64,
 }
 
+/// Tray state for tooltip relocalization
+#[derive(Debug, Clone, Default)]
+pub enum TrayTooltipState {
+    /// Default/initial state (no data yet)
+    #[default]
+    Default,
+    /// Normal usage display with provider data
+    Normal {
+        provider_name: String,
+        session_percent: f64,
+        weekly_percent: f64,
+    },
+    /// Usage with status overlay
+    WithStatus {
+        provider_name: String,
+        session_percent: f64,
+        weekly_percent: f64,
+        overlay: IconOverlay,
+    },
+    /// Credits mode
+    Credits {
+        provider_name: String,
+        credits_percent: f64,
+    },
+    /// Loading state
+    Loading,
+    /// No providers available
+    NoProviders,
+    /// Merged providers display
+    Merged {
+        providers: Vec<ProviderUsage>,
+    },
+    /// Error state
+    Error {
+        provider_name: String,
+        error_msg: String,
+    },
+}
+
 /// System tray manager
 pub struct TrayManager {
     tray_icon: TrayIcon,
@@ -99,6 +138,8 @@ pub struct TrayManager {
     provider_menu_items: HashMap<ProviderId, CheckMenuItem>,
     last_usage_signature: Cell<Option<u64>>,
     last_merged_signature: Cell<Option<u64>>,
+    /// Current tooltip state for language relocalization
+    tooltip_state: RefCell<TrayTooltipState>,
 }
 
 impl TrayManager {
@@ -197,11 +238,19 @@ impl TrayManager {
             provider_menu_items,
             last_usage_signature: Cell::new(None),
             last_merged_signature: Cell::new(None),
+            tooltip_state: RefCell::new(TrayTooltipState::Default),
         })
     }
 
     /// Update the tray icon based on usage percentages (single provider mode)
     pub fn update_usage(&self, session_percent: f64, weekly_percent: f64, provider_name: &str) {
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Normal {
+            provider_name: provider_name.to_string(),
+            session_percent,
+            weekly_percent,
+        };
+
         let tooltip = locale::tray_tooltip(provider_name, session_percent, weekly_percent);
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
 
@@ -226,6 +275,14 @@ impl TrayManager {
         provider_name: &str,
         overlay: IconOverlay,
     ) {
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::WithStatus {
+            provider_name: provider_name.to_string(),
+            session_percent,
+            weekly_percent,
+            overlay,
+        };
+
         let status = match overlay {
             IconOverlay::None => None,
             IconOverlay::Error => Some(IconOverlayStatus::Error),
@@ -253,6 +310,12 @@ impl TrayManager {
     /// Show error state on the tray icon
     #[allow(dead_code)]
     pub fn show_error(&self, provider_name: &str, error_msg: &str) {
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Error {
+            provider_name: provider_name.to_string(),
+            error_msg: error_msg.to_string(),
+        };
+
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::Error);
         let _ = self.tray_icon.set_icon(Some(icon));
         let tooltip = format!("{}: {}", provider_name, error_msg);
@@ -268,6 +331,14 @@ impl TrayManager {
         provider_name: &str,
         age_minutes: u64,
     ) {
+        // Store the state for language relocalization (as overlay state)
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::WithStatus {
+            provider_name: provider_name.to_string(),
+            session_percent,
+            weekly_percent,
+            overlay: IconOverlay::Stale,
+        };
+
         let icon = create_bar_icon(session_percent, weekly_percent, IconOverlay::Stale);
         let _ = self.tray_icon.set_icon(Some(icon));
 
@@ -281,6 +352,12 @@ impl TrayManager {
     /// Update the tray icon showing credits mode (thicker bar when weekly exhausted)
     /// This shows a thick credits bar when weekly quota is exhausted but credits remain
     pub fn update_credits_mode(&self, credits_percent: f64, provider_name: &str) {
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Credits {
+            provider_name: provider_name.to_string(),
+            credits_percent,
+        };
+
         let icon = create_credits_icon(credits_percent);
         let _ = self.tray_icon.set_icon(Some(icon));
 
@@ -291,6 +368,9 @@ impl TrayManager {
     /// Update the tray icon showing multiple providers (merged mode)
     pub fn update_merged(&self, providers: &[ProviderUsage]) {
         if providers.is_empty() {
+            // Store the state for language relocalization
+            *self.tooltip_state.borrow_mut() = TrayTooltipState::NoProviders;
+
             let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
             let _ = self.tray_icon.set_icon(Some(icon));
             let lang = Settings::load().ui_language;
@@ -300,6 +380,11 @@ impl TrayManager {
             )));
             return;
         }
+
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Merged {
+            providers: providers.to_vec(),
+        };
 
         let signature = Self::merged_signature(providers);
         if self.last_merged_signature.get() == Some(signature) {
@@ -331,6 +416,9 @@ impl TrayManager {
 
     /// Show loading animation on the tray icon
     pub fn show_loading(&self, pattern: LoadingPattern, phase: f64) {
+        // Store the state for language relocalization
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Loading;
+
         let primary = pattern.value(phase);
         let secondary = pattern.value(phase + pattern.secondary_offset());
 
@@ -349,6 +437,9 @@ impl TrayManager {
     /// Show morph animation on the tray icon (Unbraid effect)
     /// Progress goes from 0.0 (knot/logo) to 1.0 (usage bars)
     pub fn show_morph(&self, progress: f64, session_percent: f64, weekly_percent: f64) {
+        // Store the state for language relocalization (loading during morph)
+        *self.tooltip_state.borrow_mut() = TrayTooltipState::Loading;
+
         let icon = create_morph_icon(progress, session_percent, weekly_percent);
         let _ = self.tray_icon.set_icon(Some(icon));
         let lang = Settings::load().ui_language;
@@ -509,9 +600,46 @@ impl TrayManager {
         // Update the tray icon's menu
         let _ = self.tray_icon.set_menu(Some(Box::new(menu)));
 
-        // Update the tooltip with current language
-        let tooltip = locale::get_text(lang, locale::LocaleKey::TrayLoading);
-        let _ = self.tray_icon.set_tooltip(Some(tooltip));
+        // Relocalize the tooltip based on the current state (not reset to loading)
+        let tooltip = self.relocalize_tooltip(lang);
+        let _ = self.tray_icon.set_tooltip(Some(&tooltip));
+    }
+
+    /// Relocalize tooltip based on the preserved state
+    fn relocalize_tooltip(&self, lang: crate::settings::Language) -> String {
+        let state = self.tooltip_state.borrow();
+        match &*state {
+            TrayTooltipState::Default => locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string(),
+            TrayTooltipState::Normal { provider_name, session_percent, weekly_percent } => {
+                locale::tray_tooltip(provider_name, *session_percent, *weekly_percent)
+            }
+            TrayTooltipState::WithStatus { provider_name, session_percent, weekly_percent, overlay } => {
+                let status = match overlay {
+                    IconOverlay::None => None,
+                    IconOverlay::Error => Some(IconOverlayStatus::Error),
+                    IconOverlay::Stale => Some(IconOverlayStatus::Stale),
+                    IconOverlay::Incident => Some(IconOverlayStatus::Incident),
+                    IconOverlay::Partial => Some(IconOverlayStatus::Partial),
+                };
+                locale::tray_tooltip_with_status(provider_name, *session_percent, *weekly_percent, status)
+            }
+            TrayTooltipState::Credits { provider_name, credits_percent } => {
+                locale::tray_tooltip_credits(provider_name, *credits_percent)
+            }
+            TrayTooltipState::Loading => locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string(),
+            TrayTooltipState::NoProviders => locale::get_text(lang, locale::LocaleKey::TrayNoProviders).to_string(),
+            TrayTooltipState::Merged { providers } => {
+                let tooltip_lines: Vec<String> = providers
+                    .iter()
+                    .take(4)
+                    .map(|p| format!("{}: {}%", p.name, p.session_percent as i32))
+                    .collect();
+                format!("CodexBar\n{}", tooltip_lines.join("\n"))
+            }
+            TrayTooltipState::Error { provider_name, error_msg } => {
+                format!("{}: {}", provider_name, error_msg)
+            }
+        }
     }
 }
 
@@ -573,12 +701,39 @@ pub enum TrayMenuAction {
     Quit,
 }
 
+/// Per-provider tray state for tooltip relocalization
+#[derive(Debug, Clone, Default)]
+pub enum ProviderTooltipState {
+    /// Default/initial state (no data yet)
+    #[default]
+    Default,
+    /// Normal usage display
+    Normal {
+        session_percent: f64,
+        weekly_percent: f64,
+    },
+    /// Usage with status overlay
+    WithStatus {
+        session_percent: f64,
+        weekly_percent: f64,
+        overlay: IconOverlay,
+    },
+    /// Loading state
+    Loading,
+    /// Error state
+    Error {
+        error_msg: String,
+    },
+}
+
 /// Multi-provider tray manager for per-provider icon mode
 /// Creates and manages one tray icon per enabled provider
 pub struct MultiTrayManager {
     /// Map of provider ID to their individual tray icon
     provider_icons: HashMap<ProviderId, TrayIcon>,
     provider_signatures: RefCell<HashMap<ProviderId, u64>>,
+    /// Current tooltip states for language relocalization (per provider)
+    tooltip_states: RefCell<HashMap<ProviderId, ProviderTooltipState>>,
 }
 
 impl MultiTrayManager {
@@ -587,6 +742,7 @@ impl MultiTrayManager {
         Ok(Self {
             provider_icons: HashMap::new(),
             provider_signatures: RefCell::new(HashMap::new()),
+            tooltip_states: RefCell::new(HashMap::new()),
         })
     }
 
@@ -597,6 +753,9 @@ impl MultiTrayManager {
         let enabled_set: std::collections::HashSet<_> = enabled_providers.iter().collect();
         self.provider_icons.retain(|id, _| enabled_set.contains(id));
         self.provider_signatures
+            .borrow_mut()
+            .retain(|id, _| enabled_set.contains(id));
+        self.tooltip_states
             .borrow_mut()
             .retain(|id, _| enabled_set.contains(id));
 
@@ -689,6 +848,15 @@ impl MultiTrayManager {
         weekly_percent: f64,
     ) {
         if let Some(tray_icon) = self.provider_icons.get(&provider_id) {
+            // Store the state for language relocalization
+            self.tooltip_states.borrow_mut().insert(
+                provider_id,
+                ProviderTooltipState::Normal {
+                    session_percent,
+                    weekly_percent,
+                },
+            );
+
             let signature = TrayManager::usage_signature(
                 session_percent,
                 weekly_percent,
@@ -718,6 +886,16 @@ impl MultiTrayManager {
         overlay: IconOverlay,
     ) {
         if let Some(tray_icon) = self.provider_icons.get(&provider_id) {
+            // Store the state for language relocalization
+            self.tooltip_states.borrow_mut().insert(
+                provider_id,
+                ProviderTooltipState::WithStatus {
+                    session_percent,
+                    weekly_percent,
+                    overlay,
+                },
+            );
+
             let signature = TrayManager::usage_signature(
                 session_percent,
                 weekly_percent,
@@ -758,6 +936,11 @@ impl MultiTrayManager {
         phase: f64,
     ) {
         if let Some(tray_icon) = self.provider_icons.get(&provider_id) {
+            // Store the state for language relocalization
+            self.tooltip_states
+                .borrow_mut()
+                .insert(provider_id, ProviderTooltipState::Loading);
+
             let primary = pattern.value(phase);
             let secondary = pattern.value(phase + pattern.secondary_offset());
 
@@ -776,6 +959,14 @@ impl MultiTrayManager {
     /// Show error state for a specific provider
     pub fn show_provider_error(&self, provider_id: ProviderId, error_msg: &str) {
         if let Some(tray_icon) = self.provider_icons.get(&provider_id) {
+            // Store the state for language relocalization
+            self.tooltip_states.borrow_mut().insert(
+                provider_id,
+                ProviderTooltipState::Error {
+                    error_msg: error_msg.to_string(),
+                },
+            );
+
             let icon = create_bar_icon(0.0, 0.0, IconOverlay::Error);
             let _ = tray_icon.set_icon(Some(icon));
             let tooltip = format!("{}: {}", provider_id.display_name(), error_msg);
@@ -797,7 +988,6 @@ impl MultiTrayManager {
     /// This rebuilds menus and updates tooltips for all provider icons
     pub fn refresh_language(&self) {
         let lang = Settings::load().ui_language;
-        let loading = locale::get_text(lang, locale::LocaleKey::TrayLoading);
 
         // Rebuild menus for all provider icons
         for (provider_id, tray_icon) in &self.provider_icons {
@@ -857,9 +1047,61 @@ impl MultiTrayManager {
             // Update the menu
             let _ = tray_icon.set_menu(Some(Box::new(menu)));
 
-            // Update tooltip with loading state
-            let tooltip = format!("{} - {}", provider_id.display_name(), loading);
+            // Relocalize the tooltip based on the preserved state (not reset to loading)
+            let tooltip = self.relocalize_provider_tooltip(*provider_id, lang);
             let _ = tray_icon.set_tooltip(Some(&tooltip));
+        }
+    }
+
+    /// Relocalize a provider's tooltip based on its preserved state
+    fn relocalize_provider_tooltip(
+        &self,
+        provider_id: ProviderId,
+        lang: crate::settings::Language,
+    ) -> String {
+        let states = self.tooltip_states.borrow();
+        let state = states.get(&provider_id);
+
+        match state {
+            None => {
+                // No state yet, use loading
+                let loading = locale::get_text(lang, locale::LocaleKey::TrayLoading);
+                format!("{} - {}", provider_id.display_name(), loading)
+            }
+            Some(ProviderTooltipState::Default) => {
+                let loading = locale::get_text(lang, locale::LocaleKey::TrayLoading);
+                format!("{} - {}", provider_id.display_name(), loading)
+            }
+            Some(ProviderTooltipState::Normal {
+                session_percent,
+                weekly_percent,
+            }) => locale::tray_tooltip(provider_id.display_name(), *session_percent, *weekly_percent),
+            Some(ProviderTooltipState::WithStatus {
+                session_percent,
+                weekly_percent,
+                overlay,
+            }) => {
+                let status = match overlay {
+                    IconOverlay::None => None,
+                    IconOverlay::Error => Some(IconOverlayStatus::Error),
+                    IconOverlay::Stale => Some(IconOverlayStatus::Stale),
+                    IconOverlay::Incident => Some(IconOverlayStatus::Incident),
+                    IconOverlay::Partial => Some(IconOverlayStatus::Partial),
+                };
+                locale::tray_tooltip_with_status(
+                    provider_id.display_name(),
+                    *session_percent,
+                    *weekly_percent,
+                    status,
+                )
+            }
+            Some(ProviderTooltipState::Loading) => {
+                let loading = locale::get_text(lang, locale::LocaleKey::TrayLoading);
+                format!("{} - {}", provider_id.display_name(), loading)
+            }
+            Some(ProviderTooltipState::Error { error_msg }) => {
+                format!("{}: {}", provider_id.display_name(), error_msg)
+            }
         }
     }
 }
@@ -1748,5 +1990,164 @@ mod tests {
             sig_a1, sig_c,
             "length/content change should alter signature"
         );
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_preserves_normal_state() {
+        let state = TrayTooltipState::Normal {
+            provider_name: "Claude".to_string(),
+            session_percent: 50.0,
+            weekly_percent: 25.0,
+        };
+        
+        match &state {
+            TrayTooltipState::Normal { provider_name, session_percent, weekly_percent } => {
+                assert_eq!(provider_name, "Claude");
+                assert_eq!(*session_percent, 50.0);
+                assert_eq!(*weekly_percent, 25.0);
+            }
+            _ => panic!("Expected Normal state"),
+        }
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_preserves_with_status() {
+        let state = TrayTooltipState::WithStatus {
+            provider_name: "Codex".to_string(),
+            session_percent: 75.0,
+            weekly_percent: 30.0,
+            overlay: IconOverlay::Error,
+        };
+        
+        match &state {
+            TrayTooltipState::WithStatus { provider_name, session_percent, weekly_percent, overlay } => {
+                assert_eq!(provider_name, "Codex");
+                assert_eq!(*session_percent, 75.0);
+                assert_eq!(*weekly_percent, 30.0);
+                assert_eq!(*overlay, IconOverlay::Error);
+            }
+            _ => panic!("Expected WithStatus state"),
+        }
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_preserves_credits() {
+        let state = TrayTooltipState::Credits {
+            provider_name: "OpenAI".to_string(),
+            credits_percent: 80.0,
+        };
+        
+        match &state {
+            TrayTooltipState::Credits { provider_name, credits_percent } => {
+                assert_eq!(provider_name, "OpenAI");
+                assert_eq!(*credits_percent, 80.0);
+            }
+            _ => panic!("Expected Credits state"),
+        }
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_preserves_error() {
+        let state = TrayTooltipState::Error {
+            provider_name: "Claude".to_string(),
+            error_msg: "Connection failed".to_string(),
+        };
+        
+        match &state {
+            TrayTooltipState::Error { provider_name, error_msg } => {
+                assert_eq!(provider_name, "Claude");
+                assert_eq!(error_msg, "Connection failed");
+            }
+            _ => panic!("Expected Error state"),
+        }
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_default_is_default() {
+        let state: TrayTooltipState = Default::default();
+        assert!(matches!(state, TrayTooltipState::Default));
+    }
+
+    #[test]
+    fn test_provider_tooltip_state_preserves_normal() {
+        let state = ProviderTooltipState::Normal {
+            session_percent: 60.0,
+            weekly_percent: 40.0,
+        };
+        
+        match &state {
+            ProviderTooltipState::Normal { session_percent, weekly_percent } => {
+                assert_eq!(*session_percent, 60.0);
+                assert_eq!(*weekly_percent, 40.0);
+            }
+            _ => panic!("Expected Normal state"),
+        }
+    }
+
+    #[test]
+    fn test_provider_tooltip_state_preserves_with_status() {
+        let state = ProviderTooltipState::WithStatus {
+            session_percent: 70.0,
+            weekly_percent: 35.0,
+            overlay: IconOverlay::Incident,
+        };
+        
+        match &state {
+            ProviderTooltipState::WithStatus { session_percent, weekly_percent, overlay } => {
+                assert_eq!(*session_percent, 70.0);
+                assert_eq!(*weekly_percent, 35.0);
+                assert_eq!(*overlay, IconOverlay::Incident);
+            }
+            _ => panic!("Expected WithStatus state"),
+        }
+    }
+
+    #[test]
+    fn test_provider_tooltip_state_preserves_error() {
+        let state = ProviderTooltipState::Error {
+            error_msg: "Auth failed".to_string(),
+        };
+        
+        match &state {
+            ProviderTooltipState::Error { error_msg } => {
+                assert_eq!(error_msg, "Auth failed");
+            }
+            _ => panic!("Expected Error state"),
+        }
+    }
+
+    #[test]
+    fn test_provider_tooltip_state_default_is_default() {
+        let state: ProviderTooltipState = Default::default();
+        assert!(matches!(state, ProviderTooltipState::Default));
+    }
+
+    #[test]
+    fn test_tray_tooltip_state_merged_preserves_providers() {
+        let providers = vec![
+            ProviderUsage {
+                name: "Claude".into(),
+                session_percent: 10.0,
+                weekly_percent: 20.0,
+            },
+            ProviderUsage {
+                name: "Codex".into(),
+                session_percent: 30.0,
+                weekly_percent: 40.0,
+            },
+        ];
+        
+        let state = TrayTooltipState::Merged {
+            providers: providers.clone(),
+        };
+        
+        match &state {
+            TrayTooltipState::Merged { providers: p } => {
+                assert_eq!(p.len(), 2);
+                assert_eq!(p[0].name, "Claude");
+                assert_eq!(p[1].name, "Codex");
+            }
+            _ => panic!("Expected Merged state"),
+        }
     }
 }

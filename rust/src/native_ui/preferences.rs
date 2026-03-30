@@ -2503,6 +2503,13 @@ fn render_provider_detail_panel(
 ) {
     let brand_color = provider_color(provider_id.cli_name());
 
+    // Get current language from shared state
+    let ui_language = if let Ok(state) = shared_state.lock() {
+        state.settings.ui_language
+    } else {
+        Language::English
+    };
+
     let is_enabled = if let Ok(state) = shared_state.lock() {
         state
             .settings
@@ -2572,16 +2579,19 @@ fn render_provider_detail_panel(
                 let now = chrono::Utc::now();
                 let diff = now - ts;
                 if diff.num_seconds() < 60 {
-                    "just now".to_string()
+                    locale_text(ui_language, LocaleKey::UpdatedJustNow).to_string()
                 } else if diff.num_minutes() < 60 {
-                    format!("{}m ago", diff.num_minutes())
+                    locale_text(ui_language, LocaleKey::UpdatedMinutesAgo)
+                        .replace("{}", &diff.num_minutes().to_string())
                 } else if diff.num_hours() < 24 {
-                    format!("{}h ago", diff.num_hours())
+                    locale_text(ui_language, LocaleKey::UpdatedHoursAgo)
+                        .replace("{}", &diff.num_hours().to_string())
                 } else {
-                    format!("{}d ago", diff.num_days())
+                    locale_text(ui_language, LocaleKey::UpdatedDaysAgo)
+                        .replace("{}", &diff.num_days().to_string())
                 }
             } else {
-                "never".to_string()
+                locale_text(ui_language, LocaleKey::NeverUpdated).to_string()
             };
             ui.label(
                 RichText::new(format!("{} • {}", provider_id.cli_name(), updated_str))
@@ -2642,16 +2652,19 @@ fn render_provider_detail_panel(
         let now = chrono::Utc::now();
         let diff = now - ts;
         if diff.num_seconds() < 60 {
-            "Updated just now".to_string()
+            locale_text(ui_language, LocaleKey::UpdatedJustNow).to_string()
         } else if diff.num_minutes() < 60 {
-            format!("{} 分钟前更新", diff.num_minutes())
+            locale_text(ui_language, LocaleKey::UpdatedMinutesAgo)
+                .replace("{}", &diff.num_minutes().to_string())
         } else if diff.num_hours() < 24 {
-            format!("{} 小时前更新", diff.num_hours())
+            locale_text(ui_language, LocaleKey::UpdatedHoursAgo)
+                .replace("{}", &diff.num_hours().to_string())
         } else {
-            format!("{} 天前更新", diff.num_days())
+            locale_text(ui_language, LocaleKey::UpdatedDaysAgo)
+                .replace("{}", &diff.num_days().to_string())
         }
     } else {
-        "从未更新".to_string()
+        locale_text(ui_language, LocaleKey::NeverUpdated).to_string()
     };
     let hide_personal_info = if let Ok(state) = shared_state.lock() {
         state.settings.hide_personal_info
@@ -2661,26 +2674,32 @@ fn render_provider_detail_panel(
     let account_display = if account_email.is_some() {
         PersonalInfoRedactor::redact_email(account_email.as_deref(), hide_personal_info)
     } else {
-        "Not logged in".to_string()
+        locale_text(ui_language, LocaleKey::ProviderNotSignedIn).to_string()
     };
     let account_display = if account_display.is_empty() {
-        "Not logged in".to_string()
+        locale_text(ui_language, LocaleKey::ProviderNotSignedIn).to_string()
     } else {
         account_display
     };
-    let plan_display = login_method.as_deref().unwrap_or("Unknown");
+    let plan_display = login_method.as_deref()
+        .unwrap_or_else(|| locale_text(ui_language, LocaleKey::ProviderPlan));
 
     egui::Grid::new("provider_info_grid")
         .num_columns(2)
         .spacing([16.0, 8.0])
         .show(ui, |ui| {
-            info_row(ui, "State", if is_enabled { "Enabled" } else { "Disabled" });
-            info_row(ui, "Source", "oauth + web");
-            info_row(ui, "Version", provider_id.cli_name());
-            info_row(ui, "Updated", &updated_display);
-            info_row(ui, "Status", "All Systems Operational");
-            info_row(ui, "Account", &account_display);
-            info_row(ui, "Plan", plan_display);
+            let state_label = if is_enabled {
+                locale_text(ui_language, LocaleKey::ProviderEnabled)
+            } else {
+                locale_text(ui_language, LocaleKey::ProviderDisabled)
+            };
+            info_row(ui, locale_text(ui_language, LocaleKey::State), state_label);
+            info_row(ui, locale_text(ui_language, LocaleKey::Source), "oauth + web");
+            info_row(ui, locale_text(ui_language, LocaleKey::Version), provider_id.cli_name());
+            info_row(ui, locale_text(ui_language, LocaleKey::Updated), &updated_display);
+            info_row(ui, locale_text(ui_language, LocaleKey::Status), locale_text(ui_language, LocaleKey::AllSystemsOperational));
+            info_row(ui, locale_text(ui_language, LocaleKey::Account), &account_display);
+            info_row(ui, locale_text(ui_language, LocaleKey::Plan), plan_display);
         });
 
     ui.add_space(Spacing::LG);
@@ -2689,7 +2708,7 @@ fn render_provider_detail_panel(
     // USAGE SECTION
     // ═══════════════════════════════════════════════════════════
     ui.label(
-        RichText::new("Usage")
+        RichText::new(locale_text(ui_language, LocaleKey::ProviderUsage))
             .size(FontSize::MD)
             .color(Theme::TEXT_PRIMARY)
             .strong(),
@@ -2703,19 +2722,19 @@ fn render_provider_detail_panel(
             let now = chrono::Utc::now();
             let diff = ts - now;
             if diff.num_seconds() <= 0 {
-                return Some("Resetting...".to_string());
+                return Some(locale_text(ui_language, LocaleKey::ResetInProgress).to_string());
             } else if diff.num_hours() >= 24 {
-                return Some(format!(
-                    "Resets in {}d {}h",
-                    diff.num_days(),
-                    diff.num_hours() % 24
-                ));
+                return Some(
+                    locale_text(ui_language, LocaleKey::ResetsInDaysHours)
+                        .replace("{}", &diff.num_days().to_string())
+                        .replace("{}", &(diff.num_hours() % 24).to_string())
+                );
             } else {
-                return Some(format!(
-                    "Resets in {}h {}m",
-                    diff.num_hours(),
-                    diff.num_minutes() % 60
-                ));
+                return Some(
+                    locale_text(ui_language, LocaleKey::ResetsInHoursMinutes)
+                        .replace("{}", &diff.num_hours().to_string())
+                        .replace("{}", &(diff.num_minutes() % 60).to_string())
+                );
             }
         }
         // Fall back to reset_description if available (for CLI/web sources without parsed timestamp)
@@ -2730,11 +2749,11 @@ fn render_provider_detail_panel(
 
     // Session usage bar (primary rate)
     if let Some(ref rate) = primary_rate {
-        let (percent, label) = usage_display(rate.used_percent, show_as_used);
+        let (percent, label) = usage_display(rate.used_percent, show_as_used, ui_language);
         let reset_str = format_reset(rate);
         usage_bar_row(
             ui,
-            "会话",
+            locale_text(ui_language, LocaleKey::ProviderSessionLabel),
             percent as f32,
             &label,
             reset_str.as_deref(),
@@ -2745,11 +2764,11 @@ fn render_provider_detail_panel(
 
     // Weekly usage bar (secondary rate)
     if let Some(ref rate) = secondary_rate {
-        let (percent, label) = usage_display(rate.used_percent, show_as_used);
+        let (percent, label) = usage_display(rate.used_percent, show_as_used, ui_language);
         let reset_str = format_reset(rate);
         usage_bar_row(
             ui,
-            "周度",
+            locale_text(ui_language, LocaleKey::ProviderWeeklyLabel),
             percent as f32,
             &label,
             reset_str.as_deref(),
@@ -2760,11 +2779,11 @@ fn render_provider_detail_panel(
 
     // Tertiary rate (e.g., code review)
     if let Some(ref rate) = tertiary_rate {
-        let (percent, label) = usage_display(rate.used_percent, show_as_used);
+        let (percent, label) = usage_display(rate.used_percent, show_as_used, ui_language);
         let reset_str = rate.reset_description.as_deref();
         usage_bar_row(
             ui,
-            "Code review",
+            locale_text(ui_language, LocaleKey::ProviderCodeReviewLabel),
             percent as f32,
             &label,
             reset_str,
@@ -2778,8 +2797,8 @@ fn render_provider_detail_panel(
     if tertiary_rate.is_none() {
         if let Some(remaining) = code_review_percent {
             let used = 100.0 - remaining;
-            let (percent, label) = usage_display(used, show_as_used);
-            usage_bar_row(ui, "Code review", percent as f32, &label, None, brand_color);
+            let (percent, label) = usage_display(used, show_as_used, ui_language);
+            usage_bar_row(ui, locale_text(ui_language, LocaleKey::ProviderCodeReviewLabel), percent as f32, &label, None, brand_color);
         }
     }
 
@@ -2789,7 +2808,7 @@ fn render_provider_detail_panel(
     // TRAY METRIC PREFERENCE
     // ═══════════════════════════════════════════════════════════
     ui.label(
-        RichText::new("Tray Display")
+        RichText::new(locale_text(ui_language, LocaleKey::TrayDisplayTitle))
             .size(FontSize::MD)
             .color(Theme::TEXT_PRIMARY)
             .strong(),
@@ -2845,15 +2864,18 @@ fn render_provider_detail_panel(
     if let Some(credits) = credits_remaining {
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("Credits")
+                RichText::new(locale_text(ui_language, LocaleKey::CreditsLabel))
                     .size(FontSize::SM)
                     .color(Theme::TEXT_SECONDARY),
             );
             ui.add_space(16.0);
             ui.label(
-                RichText::new(format!("{:.1} left", credits))
-                    .size(FontSize::SM)
-                    .color(Theme::TEXT_PRIMARY),
+                RichText::new(
+                    locale_text(ui_language, LocaleKey::CreditsLeft)
+                        .replace("{:.1}", &format!("{:.1}", credits))
+                )
+                .size(FontSize::SM)
+                .color(Theme::TEXT_PRIMARY),
             );
         });
         ui.add_space(Spacing::SM);
@@ -2876,25 +2898,27 @@ fn render_provider_detail_panel(
 
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Cost")
+            RichText::new(locale_text(ui_language, LocaleKey::CostTitle))
                 .size(FontSize::SM)
                 .color(Theme::TEXT_SECONDARY),
         );
         ui.add_space(32.0);
         ui.vertical(|ui| {
             ui.label(
-                RichText::new(format!(
-                    "Today: ${:.2} • {} tokens",
-                    today_cost, today_tokens
-                ))
+                RichText::new(
+                    locale_text(ui_language, LocaleKey::TodayCostFull)
+                        .replace("{:.2}", &format!("{:.2}", today_cost))
+                        .replace("{}", &today_tokens.to_string())
+                )
                 .size(FontSize::SM)
                 .color(Theme::TEXT_PRIMARY),
             );
             ui.label(
-                RichText::new(format!(
-                    "Last 30 days: ${:.2} • {} tokens",
-                    monthly_cost, monthly_tokens
-                ))
+                RichText::new(
+                    locale_text(ui_language, LocaleKey::Last30DaysCostFull)
+                        .replace("{:.2}", &format!("{:.2}", monthly_cost))
+                        .replace("{}", &monthly_tokens.to_string())
+                )
                 .size(FontSize::SM)
                 .color(Theme::TEXT_MUTED),
             );
@@ -3053,7 +3077,7 @@ fn usage_bar_row(
     });
 }
 
-fn usage_display(used_percent: f64, show_as_used: bool) -> (f64, String) {
+fn usage_display(used_percent: f64, show_as_used: bool, lang: Language) -> (f64, String) {
     let used_percent = used_percent.clamp(0.0, 100.0);
     let display_percent = if show_as_used {
         used_percent
@@ -3062,9 +3086,11 @@ fn usage_display(used_percent: f64, show_as_used: bool) -> (f64, String) {
     };
 
     let label = if show_as_used {
-        format!("已使用 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::ShowUsedPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     } else {
-        format!("剩余 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::ShowRemainingPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     };
 
     (display_percent, label)

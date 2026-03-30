@@ -273,6 +273,17 @@ pub enum LocaleKey {
     SectionUsageBreakdown,
     SectionCost,
 
+    // Main popup - Usage/reset labels
+    ResetInProgress,
+    TomorrowAt,
+    UsedPercent,
+    RemainingPercent,
+    RemainingAmount,
+    Tokens1K,
+    TodayCost,
+    Last30DaysCost,
+    StatusLabel,
+
     // Tray - Single icon mode
     TrayOpenCodexBar,
     TrayRefreshAll,
@@ -297,16 +308,76 @@ pub enum LocaleKey {
     TrayProviderSettings,
     TrayProviderQuit,
 
-    // Main popup - Usage/reset labels (were hardcoded in app.rs)
-    ResetInProgress,
-    TomorrowAt,
-    UsedPercent,
-    RemainingPercent,
-    RemainingAmount,
-    Tokens1K,
-    TodayCost,
-    Last30DaysCost,
-    StatusLabel,
+    // Provider settings - Live renderer specific
+    State,
+    Source,
+    Updated,
+    UpdatedJustNow,
+    UpdatedMinutesAgo,
+    UpdatedHoursAgo,
+    UpdatedDaysAgo,
+    Status,
+    AllSystemsOperational,
+    Plan,
+    Account,
+
+    // Provider detail - Usage section
+    ProviderSessionLabel,
+    ProviderWeeklyLabel,
+    ProviderCodeReviewLabel,
+    ResetsInShort,
+    ResetsInDaysHours,
+    ResetsInHoursMinutes,
+
+    // Provider detail - Tray Display
+    TrayDisplayTitle,
+    ShowInTray,
+
+    // Provider detail - Credits
+    CreditsLabel,
+    CreditsLeft,
+
+    // Provider detail - Cost
+    CostTitle,
+    TodayCostFull,
+    Last30DaysCostFull,
+
+    // Provider detail - Settings section
+    ProviderSettingsTitle,
+    MenuBarMetric,
+    MenuBarMetricHelper,
+    UsageSource,
+    AutoFallbackHelp,
+
+    // General tab sections
+    PrivacyTitle,
+    HidePersonalInfo,
+    HidePersonalInfoHelper,
+    UpdatesTitle,
+    UpdateChannelChoice,
+    UpdateChannelChoiceHelper,
+
+    // Keyboard shortcuts
+    KeyboardShortcutsTitle,
+    GlobalShortcutLabel,
+    ShortcutFormatHint,
+    Saved,
+    InvalidFormat,
+
+    // Cookies tab
+    BrowserCookiesTitle,
+    CookieImport,
+
+    // About tab - render_about_tab
+    AboutDescription,
+    AboutDescriptionLine2,
+    ViewOnGitHub,
+    SubmitIssue,
+    MaintainedBy,
+
+    // Usage helper functions
+    ShowUsedPercent,
+    ShowRemainingPercent,
 
     // Main popup - Update banner messages (non-happy-path)
     UpdateAvailableMessage,
@@ -549,6 +620,78 @@ impl LocaleKey {
             LocaleKey::TrayProviderRefresh => "Refresh",
             LocaleKey::TrayProviderSettings => "Settings...",
             LocaleKey::TrayProviderQuit => "Quit",
+
+            // Provider settings - Live renderer specific
+            LocaleKey::State => "State",
+            LocaleKey::Source => "Source",
+            LocaleKey::Updated => "Updated",
+            LocaleKey::NeverUpdated => "Never updated",
+            LocaleKey::UpdatedJustNow => "Updated just now",
+            LocaleKey::UpdatedMinutesAgo => "{} minutes ago",
+            LocaleKey::UpdatedHoursAgo => "{} hours ago",
+            LocaleKey::UpdatedDaysAgo => "{} days ago",
+            LocaleKey::Status => "Status",
+            LocaleKey::AllSystemsOperational => "All Systems Operational",
+            LocaleKey::Plan => "Plan",
+            LocaleKey::Account => "Account",
+
+            // Provider detail - Usage section
+            LocaleKey::ProviderSessionLabel => "Session",
+            LocaleKey::ProviderWeeklyLabel => "Weekly",
+            LocaleKey::ProviderCodeReviewLabel => "Code review",
+            LocaleKey::ResetsInShort => "Resets in",
+            LocaleKey::ResetsInDaysHours => "Resets in {}d {}h",
+            LocaleKey::ResetsInHoursMinutes => "Resets in {}h {}m",
+
+            // Provider detail - Tray Display
+            LocaleKey::TrayDisplayTitle => "Tray Display",
+            LocaleKey::ShowInTray => "Show in tray",
+
+            // Provider detail - Credits
+            LocaleKey::CreditsLabel => "Credits",
+            LocaleKey::CreditsLeft => "{:.1} left",
+
+            // Provider detail - Cost
+            LocaleKey::CostTitle => "Cost",
+            LocaleKey::TodayCostFull => "Today: ${:.2} • {} tokens",
+            LocaleKey::Last30DaysCostFull => "Last 30 days: ${:.2} • {} tokens",
+
+            // Provider detail - Settings section
+            LocaleKey::ProviderSettingsTitle => "Settings",
+            LocaleKey::MenuBarMetric => "Menu Bar Metric",
+            LocaleKey::MenuBarMetricHelper => "Choose which time window drives the menu bar percentage",
+            LocaleKey::UsageSource => "Usage Source",
+            LocaleKey::AutoFallbackHelp => "Auto falls back to the next source if the preferred one fails.",
+
+            // General tab sections
+            LocaleKey::PrivacyTitle => "Privacy",
+            LocaleKey::HidePersonalInfo => "Hide Personal Info",
+            LocaleKey::HidePersonalInfoHelper => "Mask emails and account names (good for streaming)",
+            LocaleKey::UpdatesTitle => "Updates",
+            LocaleKey::UpdateChannelChoice => "Update Channel",
+            LocaleKey::UpdateChannelChoiceHelper => "Choose between stable and beta preview versions",
+
+            // Keyboard shortcuts
+            LocaleKey::KeyboardShortcutsTitle => "Keyboard Shortcuts",
+            LocaleKey::GlobalShortcutLabel => "Global Shortcut",
+            LocaleKey::ShortcutFormatHint => "Format: Ctrl+Shift+Key, Alt+Ctrl+Key, etc. Restart required to apply changes.",
+            LocaleKey::Saved => "Saved (restart to apply)",
+            LocaleKey::InvalidFormat => "Invalid shortcut format",
+
+            // Cookies tab
+            LocaleKey::BrowserCookiesTitle => "Browser Cookies",
+            LocaleKey::CookieImport => "Cookie Import",
+
+            // About tab
+            LocaleKey::AboutDescription => "A Windows port of the original macOS version.",
+            LocaleKey::AboutDescriptionLine2 => "Track AI provider usage in your system tray.",
+            LocaleKey::ViewOnGitHub => "→ View on GitHub",
+            LocaleKey::SubmitIssue => "→ Submit an Issue",
+            LocaleKey::MaintainedBy => "Maintained by CodexBar contributors",
+
+            // Usage helper functions
+            LocaleKey::ShowUsedPercent => "{:.0}% used",
+            LocaleKey::ShowRemainingPercent => "{:.0}% remaining",
         }
     }
 
@@ -781,6 +924,78 @@ impl LocaleKey {
             LocaleKey::TrayProviderRefresh => "刷新",
             LocaleKey::TrayProviderSettings => "设置...",
             LocaleKey::TrayProviderQuit => "退出",
+
+            // Provider settings - Live renderer specific
+            LocaleKey::State => "状态",
+            LocaleKey::Source => "来源",
+            LocaleKey::Updated => "更新时间",
+            LocaleKey::NeverUpdated => "从未更新",
+            LocaleKey::UpdatedJustNow => "刚刚更新",
+            LocaleKey::UpdatedMinutesAgo => "{} 分钟前更新",
+            LocaleKey::UpdatedHoursAgo => "{} 小时前更新",
+            LocaleKey::UpdatedDaysAgo => "{} 天前更新",
+            LocaleKey::Status => "状态",
+            LocaleKey::AllSystemsOperational => "系统运行正常",
+            LocaleKey::Plan => "套餐",
+            LocaleKey::Account => "账号",
+
+            // Provider detail - Usage section
+            LocaleKey::ProviderSessionLabel => "本次会话",
+            LocaleKey::ProviderWeeklyLabel => "本周",
+            LocaleKey::ProviderCodeReviewLabel => "代码审查",
+            LocaleKey::ResetsInShort => "重置于",
+            LocaleKey::ResetsInDaysHours => "{} 天 {} 小时后重置",
+            LocaleKey::ResetsInHoursMinutes => "{} 小时 {} 分钟后重置",
+
+            // Provider detail - Tray Display
+            LocaleKey::TrayDisplayTitle => "托盘显示",
+            LocaleKey::ShowInTray => "在托盘中显示",
+
+            // Provider detail - Credits
+            LocaleKey::CreditsLabel => "额度",
+            LocaleKey::CreditsLeft => "剩余 {:.1}",
+
+            // Provider detail - Cost
+            LocaleKey::CostTitle => "费用",
+            LocaleKey::TodayCostFull => "今日：${:.2} • {} tokens",
+            LocaleKey::Last30DaysCostFull => "近 30 天：${:.2} • {} tokens",
+
+            // Provider detail - Settings section
+            LocaleKey::ProviderSettingsTitle => "设置",
+            LocaleKey::MenuBarMetric => "菜单栏指标",
+            LocaleKey::MenuBarMetricHelper => "选择由哪个时间窗口驱动菜单栏百分比",
+            LocaleKey::UsageSource => "用量来源",
+            LocaleKey::AutoFallbackHelp => "当首选来源失败时自动回退到下一个来源。",
+
+            // General tab sections
+            LocaleKey::PrivacyTitle => "隐私",
+            LocaleKey::HidePersonalInfo => "隐藏个人信息",
+            LocaleKey::HidePersonalInfoHelper => "遮蔽邮箱和账号名称（适合直播时使用）",
+            LocaleKey::UpdatesTitle => "更新",
+            LocaleKey::UpdateChannelChoice => "更新通道",
+            LocaleKey::UpdateChannelChoiceHelper => "在稳定版与测试预览版之间选择",
+
+            // Keyboard shortcuts
+            LocaleKey::KeyboardShortcutsTitle => "快捷键",
+            LocaleKey::GlobalShortcutLabel => "全局快捷键",
+            LocaleKey::ShortcutFormatHint => "格式：Ctrl+Shift+Key、Alt+Ctrl+Key 等。需重启以应用更改。",
+            LocaleKey::Saved => "已保存（需重启以应用）",
+            LocaleKey::InvalidFormat => "无效的快捷键格式",
+
+            // Cookies tab
+            LocaleKey::BrowserCookiesTitle => "浏览器 Cookie",
+            LocaleKey::CookieImport => "Cookie 导入",
+
+            // About tab
+            LocaleKey::AboutDescription => "CodexBar 的 Windows 移植版本。",
+            LocaleKey::AboutDescriptionLine2 => "在系统托盘中追踪 AI 服务商用量。",
+            LocaleKey::ViewOnGitHub => "→ 查看 GitHub",
+            LocaleKey::SubmitIssue => "→ 提交问题",
+            LocaleKey::MaintainedBy => "由 CodexBar 贡献者维护",
+
+            // Usage helper functions
+            LocaleKey::ShowUsedPercent => "已使用 {:.0}%",
+            LocaleKey::ShowRemainingPercent => "剩余 {:.0}%",
         }
     }
 }
