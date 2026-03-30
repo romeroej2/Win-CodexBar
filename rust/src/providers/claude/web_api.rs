@@ -1,7 +1,7 @@
 //! Claude Web API fetcher - uses browser cookies to fetch usage from claude.ai
 
 use chrono::{DateTime, Utc};
-use reqwest::{header, Client};
+use reqwest::{Client, header};
 use serde::Deserialize;
 
 use crate::browser::cookies::get_cookie_header;
@@ -315,7 +315,7 @@ impl ClaudeWebApiFetcher {
 
     /// Convert a usage window to a RateWindow
     fn to_rate_window(&self, window: &UsageWindow, window_minutes: Option<u32>) -> RateWindow {
-        let used_percent = window.utilization.unwrap_or(0.0);
+        let used_percent = normalize_utilization(window.utilization.unwrap_or(0.0));
 
         let resets_at = window
             .resets_at
@@ -357,8 +357,33 @@ impl ClaudeWebApiFetcher {
     }
 }
 
+fn normalize_utilization(utilization: f64) -> f64 {
+    if utilization > 0.0 && utilization <= 1.0 {
+        utilization * 100.0
+    } else {
+        utilization
+    }
+}
+
 impl Default for ClaudeWebApiFetcher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_utilization;
+
+    #[test]
+    fn normalizes_fractional_utilization_to_percent() {
+        assert!((normalize_utilization(0.23) - 23.0).abs() < f64::EPSILON);
+        assert!((normalize_utilization(1.0) - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preserves_percent_utilization_values() {
+        assert!((normalize_utilization(23.0) - 23.0).abs() < f64::EPSILON);
+        assert!(normalize_utilization(0.0).abs() < f64::EPSILON);
     }
 }

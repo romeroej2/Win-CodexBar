@@ -332,7 +332,7 @@ impl ClaudeOAuthFetcher {
 
     /// Convert OAuth usage window to RateWindow
     fn to_rate_window(window: &UsageWindow, window_minutes: Option<u32>) -> Option<RateWindow> {
-        let utilization = window.utilization?;
+        let utilization = normalize_utilization(window.utilization?);
 
         let resets_at = window
             .resets_at
@@ -350,9 +350,34 @@ impl ClaudeOAuthFetcher {
     }
 }
 
+fn normalize_utilization(utilization: f64) -> f64 {
+    if utilization > 0.0 && utilization <= 1.0 {
+        utilization * 100.0
+    } else {
+        utilization
+    }
+}
+
 impl Default for ClaudeOAuthFetcher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_utilization;
+
+    #[test]
+    fn normalizes_fractional_utilization_to_percent() {
+        assert!((normalize_utilization(0.23) - 23.0).abs() < f64::EPSILON);
+        assert!((normalize_utilization(1.0) - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preserves_percent_utilization_values() {
+        assert!((normalize_utilization(23.0) - 23.0).abs() < f64::EPSILON);
+        assert!(normalize_utilization(0.0).abs() < f64::EPSILON);
     }
 }
 

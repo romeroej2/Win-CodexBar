@@ -6,15 +6,16 @@
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::cell::{Cell, RefCell};
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use tray_icon::{
-    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
     Icon, TrayIcon, TrayIconBuilder,
+    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
 
 use super::icon::{LoadingPattern, UsageLevel};
 use crate::core::ProviderId;
+use crate::i18n::{is_zh, tr};
 use crate::settings::{Settings, TrayIconMode};
 use crate::status::IndicatorStatusLevel;
 
@@ -94,6 +95,7 @@ pub struct ProviderUsage {
 /// System tray manager
 pub struct TrayManager {
     tray_icon: TrayIcon,
+    ui_language: String,
     /// Provider menu items for updating with status prefixes
     provider_menu_items: HashMap<ProviderId, CheckMenuItem>,
     last_usage_signature: Cell<Option<u64>>,
@@ -104,17 +106,28 @@ impl TrayManager {
     /// Create a new tray manager with default icon
     pub fn new() -> anyhow::Result<Self> {
         let settings = Settings::load();
+        let ui_language = settings.ui_language.clone();
         let menu = Menu::new();
 
         // Open CodexBar
-        let open_item = MenuItem::with_id("open", "打开 CodexBar", true, None);
+        let open_item = MenuItem::with_id(
+            "open",
+            tr(&ui_language, "Open CodexBar", "打开 CodexBar"),
+            true,
+            None,
+        );
         menu.append(&open_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Refresh All
-        let refresh_item = MenuItem::with_id("refresh", "全部刷新", true, None);
+        let refresh_item = MenuItem::with_id(
+            "refresh",
+            tr(&ui_language, "Refresh All", "全部刷新"),
+            true,
+            None,
+        );
         menu.append(&refresh_item)?;
 
         // Separator
@@ -122,7 +135,7 @@ impl TrayManager {
 
         // Providers submenu with check items
         // Build submenu items first, then add to parent menu to avoid Windows duplication bug
-        let providers_submenu = Submenu::new("服务商", true);
+        let providers_submenu = Submenu::new(tr(&ui_language, "Providers", "服务商"), true);
         let mut provider_menu_items = HashMap::new();
         for provider_id in ProviderId::all() {
             let cli_name = provider_id.cli_name();
@@ -139,30 +152,45 @@ impl TrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Settings
-        let settings_item = MenuItem::with_id("settings", "设置...", true, None);
+        let settings_item = MenuItem::with_id(
+            "settings",
+            tr(&ui_language, "Settings...", "设置..."),
+            true,
+            None,
+        );
         menu.append(&settings_item)?;
 
         // Check for Updates
-        let updates_item = MenuItem::with_id("updates", "检查更新", true, None);
+        let updates_item = MenuItem::with_id(
+            "updates",
+            tr(&ui_language, "Check for Updates", "检查更新"),
+            true,
+            None,
+        );
         menu.append(&updates_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Quit
-        let quit_item = MenuItem::with_id("quit", "退出", true, None);
+        let quit_item = MenuItem::with_id("quit", tr(&ui_language, "Quit", "退出"), true, None);
         menu.append(&quit_item)?;
 
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
 
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("CodexBar - 加载中...")
+            .with_tooltip(tr(
+                &ui_language,
+                "CodexBar - Loading...",
+                "CodexBar - 加载中...",
+            ))
             .with_icon(icon)
             .build()?;
 
         Ok(Self {
             tray_icon,
+            ui_language,
             provider_menu_items,
             last_usage_signature: Cell::new(None),
             last_merged_signature: Cell::new(None),
@@ -171,10 +199,17 @@ impl TrayManager {
 
     /// Update the tray icon based on usage percentages (single provider mode)
     pub fn update_usage(&self, session_percent: f64, weekly_percent: f64, provider_name: &str) {
-        let tooltip = format!(
-            "{}：会话 {}% | 周度 {}%",
-            provider_name, session_percent as i32, weekly_percent as i32
-        );
+        let tooltip = if is_zh(&self.ui_language) {
+            format!(
+                "{}：会话 {}% | 周度 {}%",
+                provider_name, session_percent as i32, weekly_percent as i32
+            )
+        } else {
+            format!(
+                "{}: Session {}% | Weekly {}%",
+                provider_name, session_percent as i32, weekly_percent as i32
+            )
+        };
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
 
         if !self.should_update_usage(
@@ -200,16 +235,23 @@ impl TrayManager {
     ) {
         let status_suffix = match overlay {
             IconOverlay::None => "",
-            IconOverlay::Error => "（错误）",
-            IconOverlay::Stale => "（数据过期）",
-            IconOverlay::Incident => "（故障）",
-            IconOverlay::Partial => "（部分中断）",
+            IconOverlay::Error => tr(&self.ui_language, " (Error)", "（错误）"),
+            IconOverlay::Stale => tr(&self.ui_language, " (Stale Data)", "（数据过期）"),
+            IconOverlay::Incident => tr(&self.ui_language, " (Incident)", "（故障）"),
+            IconOverlay::Partial => tr(&self.ui_language, " (Partial Outage)", "（部分中断）"),
         };
 
-        let tooltip = format!(
-            "{}：会话 {}% | 周度 {}%{}",
-            provider_name, session_percent as i32, weekly_percent as i32, status_suffix
-        );
+        let tooltip = if is_zh(&self.ui_language) {
+            format!(
+                "{}：会话 {}% | 周度 {}%{}",
+                provider_name, session_percent as i32, weekly_percent as i32, status_suffix
+            )
+        } else {
+            format!(
+                "{}: Session {}% | Weekly {}%{}",
+                provider_name, session_percent as i32, weekly_percent as i32, status_suffix
+            )
+        };
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
 
         if !self.should_update_usage(session_percent, weekly_percent, provider_name, overlay) {
@@ -241,10 +283,17 @@ impl TrayManager {
         let icon = create_bar_icon(session_percent, weekly_percent, IconOverlay::Stale);
         let _ = self.tray_icon.set_icon(Some(icon));
 
-        let tooltip = format!(
-            "{}：会话 {}% | 周度 {}%（数据 {} 分钟前）",
-            provider_name, session_percent as i32, weekly_percent as i32, age_minutes
-        );
+        let tooltip = if is_zh(&self.ui_language) {
+            format!(
+                "{}：会话 {}% | 周度 {}%（数据 {} 分钟前）",
+                provider_name, session_percent as i32, weekly_percent as i32, age_minutes
+            )
+        } else {
+            format!(
+                "{}: Session {}% | Weekly {}% (data {} minutes ago)",
+                provider_name, session_percent as i32, weekly_percent as i32, age_minutes
+            )
+        };
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
     }
 
@@ -254,10 +303,17 @@ impl TrayManager {
         let icon = create_credits_icon(credits_percent);
         let _ = self.tray_icon.set_icon(Some(icon));
 
-        let tooltip = format!(
-            "{}：周额度已用尽 | 剩余额度 {:.0}%",
-            provider_name, credits_percent
-        );
+        let tooltip = if is_zh(&self.ui_language) {
+            format!(
+                "{}：周额度已用尽 | 剩余额度 {:.0}%",
+                provider_name, credits_percent
+            )
+        } else {
+            format!(
+                "{}: Weekly quota exhausted | Credits remaining {:.0}%",
+                provider_name, credits_percent
+            )
+        };
         let _ = self.tray_icon.set_tooltip(Some(&tooltip));
     }
 
@@ -266,7 +322,11 @@ impl TrayManager {
         if providers.is_empty() {
             let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
             let _ = self.tray_icon.set_icon(Some(icon));
-            let _ = self.tray_icon.set_tooltip(Some("CodexBar - 无可用服务商"));
+            let _ = self.tray_icon.set_tooltip(Some(tr(
+                &self.ui_language,
+                "CodexBar - No providers available",
+                "CodexBar - 无可用服务商",
+            )));
             return;
         }
 
@@ -309,7 +369,11 @@ impl TrayManager {
 
         let icon = create_loading_icon(primary, secondary);
         let _ = self.tray_icon.set_icon(Some(icon));
-        let _ = self.tray_icon.set_tooltip(Some("CodexBar - 加载中..."));
+        let _ = self.tray_icon.set_tooltip(Some(tr(
+            &self.ui_language,
+            "CodexBar - Loading...",
+            "CodexBar - 加载中...",
+        )));
     }
 
     /// Show morph animation on the tray icon (Unbraid effect)
@@ -317,7 +381,11 @@ impl TrayManager {
     pub fn show_morph(&self, progress: f64, session_percent: f64, weekly_percent: f64) {
         let icon = create_morph_icon(progress, session_percent, weekly_percent);
         let _ = self.tray_icon.set_icon(Some(icon));
-        let _ = self.tray_icon.set_tooltip(Some("CodexBar - 加载中..."));
+        let _ = self.tray_icon.set_tooltip(Some(tr(
+            &self.ui_language,
+            "CodexBar - Loading...",
+            "CodexBar - 加载中...",
+        )));
     }
 
     /// Show a surprise animation frame
@@ -456,14 +524,17 @@ pub enum TrayMenuAction {
 pub struct MultiTrayManager {
     /// Map of provider ID to their individual tray icon
     provider_icons: HashMap<ProviderId, TrayIcon>,
+    ui_language: String,
     provider_signatures: RefCell<HashMap<ProviderId, u64>>,
 }
 
 impl MultiTrayManager {
     /// Create a new multi-tray manager with icons for enabled providers
     pub fn new() -> anyhow::Result<Self> {
+        let settings = Settings::load();
         Ok(Self {
             provider_icons: HashMap::new(),
+            ui_language: settings.ui_language,
             provider_signatures: RefCell::new(HashMap::new()),
         })
     }
@@ -506,13 +577,18 @@ impl MultiTrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Open CodexBar
-        let open_item = MenuItem::with_id("open", "打开 CodexBar", true, None);
+        let open_item = MenuItem::with_id(
+            "open",
+            tr(&self.ui_language, "Open CodexBar", "打开 CodexBar"),
+            true,
+            None,
+        );
         menu.append(&open_item)?;
 
         // Refresh
         let refresh_item = MenuItem::with_id(
             &format!("refresh_{}", provider_id.cli_name()),
-            "刷新",
+            tr(&self.ui_language, "Refresh", "刷新"),
             true,
             None,
         );
@@ -521,17 +597,27 @@ impl MultiTrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Settings
-        let settings_item = MenuItem::with_id("settings", "设置...", true, None);
+        let settings_item = MenuItem::with_id(
+            "settings",
+            tr(&self.ui_language, "Settings...", "设置..."),
+            true,
+            None,
+        );
         menu.append(&settings_item)?;
 
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Quit
-        let quit_item = MenuItem::with_id("quit", "退出", true, None);
+        let quit_item =
+            MenuItem::with_id("quit", tr(&self.ui_language, "Quit", "退出"), true, None);
         menu.append(&quit_item)?;
 
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
-        let tooltip = format!("{} - 加载中...", provider_id.display_name());
+        let tooltip = format!(
+            "{} - {}",
+            provider_id.display_name(),
+            tr(&self.ui_language, "Loading...", "加载中...")
+        );
 
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
@@ -565,7 +651,7 @@ impl MultiTrayManager {
             let _ = tray_icon.set_icon(Some(icon));
 
             let tooltip = format!(
-                "{}：会话 {}% | 周度 {}%",
+                "{}: Session {}% | Weekly {}%",
                 provider_id.display_name(),
                 session_percent as i32,
                 weekly_percent as i32
@@ -599,14 +685,14 @@ impl MultiTrayManager {
 
             let status_suffix = match overlay {
                 IconOverlay::None => "",
-                IconOverlay::Error => "（错误）",
-                IconOverlay::Stale => "（数据过期）",
-                IconOverlay::Incident => "（故障）",
-                IconOverlay::Partial => "（部分中断）",
+                IconOverlay::Error => " (Error)",
+                IconOverlay::Stale => " (Stale Data)",
+                IconOverlay::Incident => " (Incident)",
+                IconOverlay::Partial => " (Partial Outage)",
             };
 
             let tooltip = format!(
-                "{}：会话 {}% | 周度 {}%{}",
+                "{}: Session {}% | Weekly {}%{}",
                 provider_id.display_name(),
                 session_percent as i32,
                 weekly_percent as i32,
@@ -630,7 +716,7 @@ impl MultiTrayManager {
             let icon = create_loading_icon(primary, secondary);
             let _ = tray_icon.set_icon(Some(icon));
             let _ = tray_icon.set_tooltip(Some(&format!(
-                "{} - 加载中...",
+                "{} - Loading...",
                 provider_id.display_name()
             )));
         }

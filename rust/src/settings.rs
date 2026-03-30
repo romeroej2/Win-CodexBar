@@ -180,6 +180,10 @@ pub struct Settings {
     /// Hide personal info (emails, account names) for streaming/sharing
     pub hide_personal_info: bool,
 
+    /// UI language for tray and popup labels ("en" or "zh")
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
+
     /// Update channel for receiving updates (Stable or Beta)
     pub update_channel: UpdateChannel,
 
@@ -208,6 +212,10 @@ fn default_global_shortcut() -> String {
     "Ctrl+Shift+U".to_string()
 }
 
+fn default_ui_language() -> String {
+    crate::i18n::UI_LANGUAGE_EN.to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         let mut enabled = HashSet::new();
@@ -234,6 +242,7 @@ impl Default for Settings {
             menu_bar_display_mode: "detailed".to_string(), // Detailed mode by default
             show_credits_extra_usage: true, // Show credits + extra usage by default
             hide_personal_info: false, // Show personal info by default
+            ui_language: default_ui_language(), // English by default
             update_channel: UpdateChannel::default(), // Stable by default
             provider_metrics: HashMap::new(), // Empty = use Automatic for all
             global_shortcut: default_global_shortcut(), // Ctrl+Shift+U by default
@@ -300,8 +309,8 @@ impl Settings {
 
         #[cfg(target_os = "windows")]
         {
-            use winreg::enums::*;
             use winreg::RegKey;
+            use winreg::enums::*;
 
             let hkcu = RegKey::predef(HKEY_CURRENT_USER);
             let run_key = hkcu.open_subkey_with_flags(
@@ -328,8 +337,8 @@ impl Settings {
     /// Check if start at login is actually enabled in registry
     #[cfg(target_os = "windows")]
     pub fn is_start_at_login_enabled() -> bool {
-        use winreg::enums::*;
         use winreg::RegKey;
+        use winreg::enums::*;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         if let Ok(run_key) = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run") {
@@ -735,7 +744,9 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             name: "Warp",
             requires_api_key: true,
             api_key_env_var: Some("WARP_API_KEY"),
-            api_key_help: Some("Get your API key from Warp → Settings → API Keys (docs.warp.dev/reference/cli/api-keys)"),
+            api_key_help: Some(
+                "Get your API key from Warp → Settings → API Keys (docs.warp.dev/reference/cli/api-keys)",
+            ),
             config_file_path: None,
             dashboard_url: Some("https://docs.warp.dev/reference/cli/api-keys"),
         },

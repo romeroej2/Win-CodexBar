@@ -22,6 +22,7 @@ use crate::core::{
 };
 use crate::core::{TokenAccountStore, TokenAccountSupport};
 use crate::cost_scanner::get_daily_cost_history;
+use crate::i18n::tr;
 use crate::login::LoginPhase;
 use crate::providers::*;
 use crate::settings::{ApiKeys, ManualCookies, Settings};
@@ -132,6 +133,7 @@ impl ProviderData {
         result: &ProviderFetchResult,
         metadata: &crate::core::ProviderMetadata,
         reset_time_relative: bool,
+        ui_language: &str,
     ) -> Self {
         let snapshot = &result.usage;
         let (pace_percent, pace_lasts) = calculate_pace(&snapshot.primary);
@@ -159,14 +161,16 @@ impl ProviderData {
             display_name: id.display_name().to_string(),
             account: snapshot.account_email.clone(), // Account email if available
             session_percent: Some(snapshot.primary.used_percent),
-            session_reset: snapshot
-                .primary
-                .resets_at
-                .map(|t| format_reset_time(t, reset_time_relative)),
+            session_reset: snapshot.primary.resets_at.map_or_else(
+                || snapshot.primary.reset_description.clone(),
+                |t| Some(format_reset_time(t, reset_time_relative, ui_language)),
+            ),
             weekly_percent: snapshot.secondary.as_ref().map(|s| s.used_percent),
             weekly_reset: snapshot.secondary.as_ref().and_then(|s| {
-                s.resets_at
-                    .map(|t| format_reset_time(t, reset_time_relative))
+                s.resets_at.map_or_else(
+                    || s.reset_description.clone(),
+                    |t| Some(format_reset_time(t, reset_time_relative, ui_language)),
+                )
             }),
             model_percent: snapshot.model_specific.as_ref().map(|m| m.used_percent),
             model_name: snapshot
@@ -260,13 +264,17 @@ impl ProviderData {
     }
 }
 
-fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> String {
+fn format_reset_time(
+    reset: chrono::DateTime<chrono::Utc>,
+    relative: bool,
+    ui_language: &str,
+) -> String {
     if relative {
         let now = chrono::Utc::now();
         let diff = reset - now;
 
         if diff.num_seconds() <= 0 {
-            return "正在重置...".to_string();
+            return tr(ui_language, "Resetting...", "正在重置...").to_string();
         }
 
         let hours = diff.num_hours();
@@ -290,7 +298,11 @@ fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> St
         if reset_date == today {
             local_time.format("%I:%M %p").to_string()
         } else if reset_date == today + chrono::Days::new(1) {
-            format!("明天 {}", local_time.format("%I:%M %p"))
+            format!(
+                "{} {}",
+                tr(ui_language, "Tomorrow", "明天"),
+                local_time.format("%I:%M %p")
+            )
         } else {
             local_time.format("%b %d, %I:%M %p").to_string()
         }
@@ -337,11 +349,19 @@ fn usage_display_percent(used_percent: f64, show_as_used: bool) -> f64 {
     }
 }
 
-fn usage_display_label(display_percent: f64, show_as_used: bool) -> String {
+fn usage_display_label(display_percent: f64, show_as_used: bool, ui_language: &str) -> String {
     if show_as_used {
-        format!("已使用 {:.0}%", display_percent)
+        format!(
+            "{} {:.0}%",
+            tr(ui_language, "Used", "已使用"),
+            display_percent
+        )
     } else {
-        format!("剩余 {:.0}%", display_percent)
+        format!(
+            "{} {:.0}%",
+            tr(ui_language, "Remaining", "剩余"),
+            display_percent
+        )
     }
 }
 
@@ -796,6 +816,7 @@ impl CodexBarApp {
         let manual_cookies = ManualCookies::load();
         let api_keys = ApiKeys::load();
         let reset_time_relative = self.settings.reset_time_relative;
+        let ui_language = self.settings.ui_language.clone();
         // Load token accounts for account switching support
         let token_accounts = TokenAccountStore::new().load().unwrap_or_default();
 
@@ -895,6 +916,7 @@ impl CodexBarApp {
                             ..FetchContext::default()
                         };
                         let state = Arc::clone(&state);
+                        let ui_language = ui_language.clone();
                         tokio::spawn(async move {
                             let provider = create_provider(id);
                             let metadata = provider.metadata().clone();
@@ -923,6 +945,7 @@ impl CodexBarApp {
                                     &result,
                                     &metadata,
                                     reset_time_relative,
+                                    &ui_language,
                                 ),
                                 Ok(Err(e)) => ProviderData::from_error(id, e.to_string()),
                                 Err(_) => ProviderData::from_error(id, "Timeout".to_string()),
@@ -1743,6 +1766,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    &self.settings.ui_language,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1755,6 +1779,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    &self.settings.ui_language,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1784,7 +1809,7 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(tr(&self.settings.ui_language, "Loading providers...", "正在加载服务商..."))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1799,7 +1824,7 @@ impl eframe::App for CodexBarApp {
                                 .show(ui, |ui| {
                                     ui.vertical_centered(|ui| {
                                         ui.label(
-                                            RichText::new("暂无服务商数据。")
+                                            RichText::new(tr(&self.settings.ui_language, "No provider data available.", "暂无服务商数据。"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1819,18 +1844,25 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(tr(&self.settings.ui_language, "Loading providers...", "正在加载服务商..."))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                     } else {
                                         ui.label(
-                                            RichText::new("尚未选择服务商。")
+                                            RichText::new(tr(&self.settings.ui_language, "No providers selected.", "尚未选择服务商。"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                         ui.add_space(Spacing::SM);
-                                        if ui.button("打开服务商设置").clicked() {
+                                        if ui
+                                            .button(tr(
+                                                &self.settings.ui_language,
+                                                "Open provider settings",
+                                                "打开服务商设置",
+                                            ))
+                                            .clicked()
+                                        {
                                             self.preferences_window.active_tab = super::preferences::PreferencesTab::Providers;
                                             self.preferences_window.open();
                                         }
@@ -1847,14 +1879,20 @@ impl eframe::App for CodexBarApp {
                     draw_horizontal_separator(ui, 0.0);
                     ui.add_space(4.0);
 
-                    if draw_text_menu_item(ui, "设置...") {
+                    if draw_text_menu_item(
+                        ui,
+                        tr(&self.settings.ui_language, "Settings...", "设置..."),
+                    ) {
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "关于 CodexBar") {
+                    if draw_text_menu_item(
+                        ui,
+                        tr(&self.settings.ui_language, "About CodexBar", "关于 CodexBar"),
+                    ) {
                         self.preferences_window.active_tab = super::preferences::PreferencesTab::About;
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "退出") {
+                    if draw_text_menu_item(ui, tr(&self.settings.ui_language, "Quit", "退出")) {
                         std::process::exit(0);
                     }
                 }); // end ScrollArea
@@ -1905,6 +1943,7 @@ fn draw_provider_detail_card(
     show_credits_extra: bool,
     show_as_used: bool,
     hide_personal_info: bool,
+    ui_language: &str,
 ) -> (bool, Option<String>) {
     let mut refresh_requested = false;
     let mut account_switch_requested: Option<String> = None;
@@ -1964,7 +2003,7 @@ fn draw_provider_detail_card(
                         );
                     } else {
                         ui.label(
-                            RichText::new("刚刚更新")
+                            RichText::new(tr(ui_language, "Updated just now", "刚刚更新"))
                                 .size(FontSize::XS)
                                 .color(Theme::TEXT_SECONDARY),
                         );
@@ -1992,9 +2031,13 @@ fn draw_provider_detail_card(
                         ui.horizontal(|ui| {
                             let status_col = status_color(provider.status_level);
                             ui.label(
-                                RichText::new(format!("状态：{}", status_desc))
-                                    .size(FontSize::XS)
-                                    .color(status_col),
+                                RichText::new(format!(
+                                    "{}: {}",
+                                    tr(ui_language, "Status", "状态"),
+                                    status_desc
+                                ))
+                                .size(FontSize::XS)
+                                .color(status_col),
                             );
                         });
                     }
@@ -2026,10 +2069,11 @@ fn draw_provider_detail_card(
             if let Some(session_pct) = provider.session_percent {
                 draw_metric_row(
                     ui,
-                    "会话",
+                    tr(ui_language, "Session", "会话"),
                     session_pct,
                     show_as_used,
                     provider.session_reset.as_deref(),
+                    ui_language,
                     brand_color,
                     content_width,
                     None, // No pace for session
@@ -2043,10 +2087,11 @@ fn draw_provider_detail_card(
 
                 draw_metric_row(
                     ui,
-                    "周度",
+                    tr(ui_language, "Weekly", "周度"),
                     weekly_pct,
                     show_as_used,
                     provider.weekly_reset.as_deref(),
+                    ui_language,
                     brand_color,
                     content_width,
                     provider.pace_percent,
@@ -2058,13 +2103,18 @@ fn draw_provider_detail_card(
             if let Some(model_pct) = provider.model_percent {
                 ui.add_space(12.0);
 
-                let model_label = provider.model_name.as_deref().unwrap_or("模型");
+                let model_label =
+                    provider
+                        .model_name
+                        .as_deref()
+                        .unwrap_or(tr(ui_language, "Model", "模型"));
                 draw_metric_row(
                     ui,
                     model_label,
                     model_pct,
                     show_as_used,
                     None,
+                    ui_language,
                     brand_color,
                     content_width,
                     None, // No pace for model
@@ -2078,7 +2128,7 @@ fn draw_provider_detail_card(
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(
-                    RichText::new("无法获取用量")
+                    RichText::new(tr(ui_language, "Unable to fetch usage", "无法获取用量"))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_SECONDARY),
                 );
@@ -2100,7 +2150,7 @@ fn draw_provider_detail_card(
 
                 // Title: "Credits" - .font(.body).fontWeight(.medium)
                 ui.label(
-                    RichText::new("额度")
+                    RichText::new(tr(ui_language, "Credits", "额度"))
                         .size(FontSize::BASE)
                         .color(Theme::TEXT_PRIMARY)
                         .strong(),
@@ -2131,9 +2181,13 @@ fn draw_provider_detail_card(
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new(format!("剩余 {:.2}", credits))
-                            .size(FontSize::XS)
-                            .color(Theme::TEXT_PRIMARY),
+                        RichText::new(format!(
+                            "{} {:.2}",
+                            tr(ui_language, "Remaining", "剩余"),
+                            credits
+                        ))
+                        .size(FontSize::XS)
+                        .color(Theme::TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
@@ -2146,7 +2200,7 @@ fn draw_provider_detail_card(
 
                 // Buy Credits link
                 ui.add_space(6.0);
-                if draw_menu_item(ui, "⊕", "购买额度...") {
+                if draw_menu_item(ui, "⊕", tr(ui_language, "Buy credits...", "购买额度...")) {
                     if let Some(ref url) = provider.dashboard_url {
                         let _ = open::that(url);
                     }
@@ -2176,7 +2230,7 @@ fn draw_provider_detail_card(
             ui.add_space(12.0);
 
             ui.label(
-                RichText::new("用量明细")
+                RichText::new(tr(ui_language, "Usage breakdown", "用量明细"))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2199,7 +2253,7 @@ fn draw_provider_detail_card(
 
             // Title: "Cost" - .font(.body).fontWeight(.medium)
             ui.label(
-                RichText::new("费用")
+                RichText::new(tr(ui_language, "Cost", "费用"))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2213,14 +2267,22 @@ fn draw_provider_detail_card(
                 let today_cost: f64 = provider.cost_history.last().map(|(_, c)| *c).unwrap_or(0.0);
 
                 ui.label(
-                    RichText::new(format!("今日：${:.2}", today_cost))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_PRIMARY),
+                    RichText::new(format!(
+                        "{}: ${:.2}",
+                        tr(ui_language, "Today", "今日"),
+                        today_cost
+                    ))
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new(format!("近 30 天：${:.2}", total_30d))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_PRIMARY),
+                    RichText::new(format!(
+                        "{}: ${:.2}",
+                        tr(ui_language, "Last 30 days", "近 30 天"),
+                        total_30d
+                    ))
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_PRIMARY),
                 );
             } else if let Some(cost_used) = &provider.cost_used {
                 ui.label(
@@ -2258,7 +2320,7 @@ fn draw_provider_detail_card(
 
             // Vertical action links like macOS
             // Refresh button - first action
-            if draw_menu_item(ui, "↻", "刷新") {
+            if draw_menu_item(ui, "↻", tr(ui_language, "Refresh", "刷新")) {
                 refresh_requested = true;
             }
 
@@ -2266,7 +2328,11 @@ fn draw_provider_detail_card(
             if TokenAccountSupport::is_supported(
                 ProviderId::from_cli_name(&provider.name).unwrap_or(ProviderId::Claude),
             ) {
-                if draw_menu_item(ui, "->", "切换账号...") {
+                if draw_menu_item(
+                    ui,
+                    "->",
+                    tr(ui_language, "Switch account...", "切换账号..."),
+                ) {
                     account_switch_requested = Some(provider.name.clone());
                 }
             }
@@ -2274,14 +2340,15 @@ fn draw_provider_detail_card(
             // Usage Dashboard link
             if let Some(ref url) = provider.dashboard_url {
                 let dashboard_url = url.clone();
-                if draw_menu_item(ui, "📊", "用量仪表盘") {
+                if draw_menu_item(ui, "📊", tr(ui_language, "Usage dashboard", "用量仪表盘"))
+                {
                     let _ = open::that(&dashboard_url);
                 }
             }
 
             // Status Page link
             if let Some(status_url) = get_status_page_url(&provider.name) {
-                if draw_menu_item(ui, "⚡", "状态页面") {
+                if draw_menu_item(ui, "⚡", tr(ui_language, "Status page", "状态页面")) {
                     let _ = open::that(status_url);
                 }
             }
@@ -2289,7 +2356,7 @@ fn draw_provider_detail_card(
             // Copy Error link
             if let Some(ref error) = provider.error {
                 let error_text = error.clone();
-                if draw_menu_item(ui, "📋", "复制错误") {
+                if draw_menu_item(ui, "📋", tr(ui_language, "Copy error", "复制错误")) {
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
                         let _ = clipboard.set_text(&error_text);
                     }
@@ -2363,6 +2430,7 @@ fn draw_metric_row(
     percent: f64,
     show_as_used: bool,
     reset_text: Option<&str>,
+    ui_language: &str,
     color: Color32,
     _content_width: f32,
     pace_percent: Option<f64>,
@@ -2420,18 +2488,22 @@ fn draw_metric_row(
     // Info row: X% used (left) | Pace status | Resets in Xh (right) - .font(.footnote)
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(usage_display_label(display_percent, show_as_used))
-                .size(FontSize::XS)
-                .color(Theme::TEXT_PRIMARY),
+            RichText::new(usage_display_label(
+                display_percent,
+                show_as_used,
+                ui_language,
+            ))
+            .size(FontSize::XS)
+            .color(Theme::TEXT_PRIMARY),
         );
 
         // Pace status indicator
         if display_pace_percent.is_some() {
             ui.add_space(8.0);
             let (pace_text, pace_color) = if pace_lasts_to_reset {
-                ("进度正常", Theme::GREEN)
+                (tr(ui_language, "On pace", "进度正常"), Theme::GREEN)
             } else {
-                ("进度滞后", Theme::YELLOW)
+                (tr(ui_language, "Behind pace", "进度滞后"), Theme::YELLOW)
             };
             ui.label(
                 RichText::new(pace_text)
@@ -2443,9 +2515,13 @@ fn draw_metric_row(
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(reset) = reset_text {
                 ui.label(
-                    RichText::new(format!("重置于 {}", reset))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_SECONDARY),
+                    RichText::new(format!(
+                        "{} {}",
+                        tr(ui_language, "Resets at", "重置于"),
+                        reset
+                    ))
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_SECONDARY),
                 );
             }
         });

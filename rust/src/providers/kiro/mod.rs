@@ -8,14 +8,13 @@ pub mod version;
 // Re-exports for version compatibility checking
 #[allow(unused_imports)]
 pub use version::{
-    detect_version, find_kiro_cli, get_version, is_compatible, is_installed, KiroVersion,
+    KiroVersion, detect_version, find_kiro_cli, get_version, is_compatible, is_installed,
 };
 
 use async_trait::async_trait;
 use chrono::Datelike;
 use regex_lite::Regex;
 #[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -340,7 +339,7 @@ impl KiroProvider {
                 // Skip escape sequence
                 if chars.peek() == Some(&'[') {
                     chars.next(); // consume '['
-                                  // Skip until we hit a letter
+                    // Skip until we hit a letter
                     while let Some(&next) = chars.peek() {
                         chars.next();
                         if next.is_ascii_alphabetic() {

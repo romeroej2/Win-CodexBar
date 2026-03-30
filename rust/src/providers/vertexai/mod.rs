@@ -11,7 +11,6 @@ pub use token_refresher::{RefreshError, VertexAIOAuthCredentials, VertexAITokenR
 
 use async_trait::async_trait;
 #[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 
 use crate::core::{

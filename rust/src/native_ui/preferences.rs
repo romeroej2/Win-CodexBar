@@ -10,12 +10,13 @@ use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
 use super::provider_icons::ProviderIconCache;
-use super::theme::{provider_color, provider_icon, FontSize, Radius, Spacing, Theme};
+use super::theme::{FontSize, Radius, Spacing, Theme, provider_color, provider_icon};
 use crate::browser::cookies::get_cookie_header_from_browser;
 use crate::browser::detection::{BrowserDetector, BrowserType};
 use crate::core::{PersonalInfoRedactor, ProviderId, WidgetSnapshot, WidgetSnapshotStore};
 use crate::core::{ProviderAccountData, TokenAccount, TokenAccountStore, TokenAccountSupport};
-use crate::settings::{get_api_key_providers, ApiKeys, ManualCookies, Settings, TrayIconMode};
+use crate::i18n::tr;
+use crate::settings::{ApiKeys, ManualCookies, Settings, TrayIconMode, get_api_key_providers};
 use crate::shortcuts::format_shortcut;
 use std::collections::HashMap;
 
@@ -38,15 +39,15 @@ pub enum PreferencesTab {
 }
 
 impl PreferencesTab {
-    fn label(&self) -> &'static str {
+    fn label(&self, ui_language: &str) -> &'static str {
         match self {
-            PreferencesTab::General => "通用",
-            PreferencesTab::Providers => "服务商",
-            PreferencesTab::Display => "显示",
-            PreferencesTab::ApiKeys => "API 密钥",
+            PreferencesTab::General => tr(ui_language, "General", "通用"),
+            PreferencesTab::Providers => tr(ui_language, "Providers", "服务商"),
+            PreferencesTab::Display => tr(ui_language, "Display", "显示"),
+            PreferencesTab::ApiKeys => tr(ui_language, "API Keys", "API 密钥"),
             PreferencesTab::Cookies => "Cookies",
-            PreferencesTab::Advanced => "高级",
-            PreferencesTab::About => "关于",
+            PreferencesTab::Advanced => tr(ui_language, "Advanced", "高级"),
+            PreferencesTab::About => tr(ui_language, "About", "关于"),
         }
     }
 
@@ -300,7 +301,7 @@ impl PreferencesWindow {
         };
 
         let mut builder = egui::ViewportBuilder::default()
-            .with_title("CodexBar 设置")
+            .with_title("CodexBar Settings")
             .with_inner_size([settings_size.x, settings_size.y])
             .with_min_inner_size([settings_min_size.x, settings_min_size.y])
             .with_clamp_size_to_monitor_size(true)
@@ -406,12 +407,8 @@ impl PreferencesWindow {
 
             // Sound effects toggle
             let mut sound_enabled = self.settings.sound_enabled;
-            if setting_toggle(
-                ui,
-                "声音提示",
-                "达到阈值时播放提示音",
-                &mut sound_enabled,
-            ) {
+            if setting_toggle(ui, "声音提示", "达到阈值时播放提示音", &mut sound_enabled)
+            {
                 self.settings.sound_enabled = sound_enabled;
                 self.settings_changed = true;
             }
@@ -1089,15 +1086,13 @@ impl PreferencesWindow {
                 if ui
                     .add_enabled(
                         can_import,
-                        egui::Button::new(
-                            RichText::new("导入 Cookies").size(FontSize::SM).color(
-                                if can_import {
-                                    Color32::WHITE
-                                } else {
-                                    Theme::TEXT_MUTED
-                                },
-                            ),
-                        )
+                        egui::Button::new(RichText::new("导入 Cookies").size(FontSize::SM).color(
+                            if can_import {
+                                Color32::WHITE
+                            } else {
+                                Theme::TEXT_MUTED
+                            },
+                        ))
                         .fill(if can_import {
                             Theme::ACCENT_PRIMARY
                         } else {
@@ -1134,8 +1129,12 @@ impl PreferencesWindow {
                                 }
                                 Ok(_) => {
                                     self.browser_import_status = Some((
-                                        format!("在 {} 的 {} 中未找到 Cookies。请先确认已登录。", browser_type.display_name(), domain),
-                                        true
+                                        format!(
+                                            "在 {} 的 {} 中未找到 Cookies。请先确认已登录。",
+                                            browser_type.display_name(),
+                                            domain
+                                        ),
+                                        true,
                                     ));
                                 }
                                 Err(e) => {
@@ -1479,8 +1478,7 @@ impl PreferencesWindow {
                                 None,
                             );
                             if let Err(e) = self.api_keys.save() {
-                                self.api_key_status_msg =
-                                    Some((format!("保存失败：{}", e), true));
+                                self.api_key_status_msg = Some((format!("保存失败：{}", e), true));
                             } else {
                                 self.api_key_status_msg =
                                     Some((format!("已保存 {} 的 API key", provider_name), false));
@@ -1516,11 +1514,9 @@ impl PreferencesWindow {
         section_header(ui, "Browser Cookies");
 
         ui.label(
-            RichText::new(
-                "Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。",
-            )
-            .size(FontSize::SM)
-            .color(Theme::TEXT_MUTED),
+            RichText::new("Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。")
+                .size(FontSize::SM)
+                .color(Theme::TEXT_MUTED),
         );
 
         ui.add_space(Spacing::LG);
@@ -2005,7 +2001,7 @@ fn work_area_rect(ctx: &egui::Context) -> Option<Rect> {
     {
         use windows::Win32::Foundation::RECT as WinRect;
         use windows::Win32::UI::WindowsAndMessaging::{
-            SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+            SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
         };
 
         let mut rect = WinRect::default();
@@ -2052,6 +2048,11 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         state.active_tab
     } else {
         PreferencesTab::General
+    };
+    let ui_language = if let Ok(state) = shared_state.lock() {
+        state.settings.ui_language.clone()
+    } else {
+        crate::i18n::UI_LANGUAGE_EN.to_string()
     };
 
     ui.vertical(|ui| {
@@ -2135,7 +2136,7 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             ui.painter().text(
                 egui::pos2(tab_rect.center().x, tab_rect.min.y + 44.0),
                 egui::Align2::CENTER_CENTER,
-                tab.label(),
+                tab.label(&ui_language),
                 egui::FontId::proportional(11.0),
                 label_color,
             );
@@ -2177,7 +2178,7 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                             PreferencesTab::ApiKeys => render_api_keys_tab(ui, shared_state),
                             PreferencesTab::Cookies => render_cookies_tab(ui, shared_state),
                             PreferencesTab::Advanced => render_advanced_tab(ui, shared_state),
-                            PreferencesTab::About => render_about_tab(ui),
+                            PreferencesTab::About => render_about_tab(ui, shared_state),
                             PreferencesTab::Providers => unreachable!(),
                         }
                         ui.add_space(Spacing::LG);
@@ -2185,6 +2186,14 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             }
         }
     });
+}
+
+fn current_ui_language(shared_state: &Arc<Mutex<PreferencesSharedState>>) -> String {
+    if let Ok(state) = shared_state.lock() {
+        state.settings.ui_language.clone()
+    } else {
+        crate::i18n::UI_LANGUAGE_EN.to_string()
+    }
 }
 
 /// Render Providers tab with macOS-style sidebar + detail layout
@@ -3295,9 +3304,56 @@ fn render_accounts_section(
 
 /// Render General tab for viewport
 fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
+    let ui_language = current_ui_language(shared_state);
     section_header(ui, "Startup");
 
     settings_card(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(
+                    RichText::new(tr(&ui_language, "Language", "语言"))
+                        .size(FontSize::MD)
+                        .color(Theme::TEXT_PRIMARY),
+                );
+                ui.label(
+                    RichText::new(tr(
+                        &ui_language,
+                        "Change the tray and window language",
+                        "切换托盘和窗口语言",
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
+                );
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let current = if let Ok(state) = shared_state.lock() {
+                    state.settings.ui_language.clone()
+                } else {
+                    crate::i18n::UI_LANGUAGE_EN.to_string()
+                };
+                let mut selected = current.clone();
+                egui::ComboBox::from_id_salt("ui_language")
+                    .selected_text(if selected == "zh" {
+                        "中文"
+                    } else {
+                        "English"
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut selected, "en".to_string(), "English");
+                        ui.selectable_value(&mut selected, "zh".to_string(), "中文");
+                    });
+                if selected != current {
+                    if let Ok(mut state) = shared_state.lock() {
+                        state.settings.ui_language = selected;
+                        state.settings_changed = true;
+                    }
+                }
+            });
+        });
+
+        setting_divider(ui);
+
         let mut start_at_login = if let Ok(state) = shared_state.lock() {
             state.settings.start_at_login
         } else {
@@ -3306,8 +3362,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "开机启动",
-            "登录后自动启动 CodexBar",
+            tr(&ui_language, "Start at login", "开机启动"),
+            tr(
+                &ui_language,
+                "Automatically launch CodexBar after sign-in",
+                "登录后自动启动 CodexBar",
+            ),
             &mut start_at_login,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3329,8 +3389,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "最小化启动",
-            "启动后停留在系统托盘",
+            tr(&ui_language, "Start minimized", "最小化启动"),
+            tr(
+                &ui_language,
+                "Keep CodexBar in the system tray on launch",
+                "启动后停留在系统托盘",
+            ),
             &mut start_minimized,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3353,8 +3417,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "显示通知",
-            "达到用量阈值时提醒",
+            tr(&ui_language, "Show notifications", "显示通知"),
+            tr(
+                &ui_language,
+                "Notify when usage reaches warning levels",
+                "达到用量阈值时提醒",
+            ),
             &mut show_notifications,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3374,8 +3442,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "声音提示",
-            "达到阈值时播放提示音",
+            tr(&ui_language, "Sound alerts", "声音提示"),
+            tr(
+                &ui_language,
+                "Play a sound when thresholds are reached",
+                "达到阈值时播放提示音",
+            ),
             &mut sound_enabled,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3398,7 +3470,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 // Title row with volume badge on right
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("提示音音量")
+                        RichText::new(tr(&ui_language, "Alert volume", "提示音音量"))
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
@@ -3420,9 +3492,13 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
                 ui.add_space(2.0);
                 ui.label(
-                    RichText::new("告警提示音音量")
-                        .size(FontSize::SM)
-                        .color(Theme::TEXT_MUTED),
+                    RichText::new(tr(
+                        &ui_language,
+                        "Volume for warning and alert sounds",
+                        "告警提示音音量",
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
                 );
                 ui.add_space(6.0);
 
@@ -3456,7 +3532,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("高位预警")
+                    RichText::new(tr(&ui_language, "High usage warning", "高位预警"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3478,9 +3554,13 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("在该用量水平显示预警")
-                    .size(FontSize::SM)
-                    .color(Theme::TEXT_MUTED),
+                RichText::new(tr(
+                    &ui_language,
+                    "Show a warning at this usage level",
+                    "在该用量水平显示预警",
+                ))
+                .size(FontSize::SM)
+                .color(Theme::TEXT_MUTED),
             );
             ui.add_space(6.0);
 
@@ -3515,7 +3595,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("严重告警")
+                    RichText::new(tr(&ui_language, "Critical alert", "严重告警"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3537,9 +3617,13 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("在该水平显示严重告警")
-                    .size(FontSize::SM)
-                    .color(Theme::TEXT_MUTED),
+                RichText::new(tr(
+                    &ui_language,
+                    "Show a critical alert at this level",
+                    "在该水平显示严重告警",
+                ))
+                .size(FontSize::SM)
+                .color(Theme::TEXT_MUTED),
             );
             ui.add_space(6.0);
 
@@ -3573,8 +3657,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "隐藏个人信息",
-            "遮蔽邮箱和账号名称（适合直播时使用）",
+            tr(&ui_language, "Hide personal information", "隐藏个人信息"),
+            tr(
+                &ui_language,
+                "Mask emails and account names for streaming or screenshots",
+                "遮蔽邮箱和账号名称（适合直播时使用）",
+            ),
             &mut hide_personal_info,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3592,14 +3680,18 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("更新通道")
+                    RichText::new(tr(&ui_language, "Update channel", "更新通道"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("在稳定版与测试预览版之间选择")
-                        .size(FontSize::SM)
-                        .color(Theme::TEXT_MUTED),
+                    RichText::new(tr(
+                        &ui_language,
+                        "Choose between stable and preview builds",
+                        "在稳定版与测试预览版之间选择",
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
                 );
             });
 
@@ -3654,14 +3746,18 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("全局快捷键")
+                    RichText::new(tr(&ui_language, "Global shortcut", "全局快捷键"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("按下此快捷键可在任意位置打开 CodexBar")
-                        .size(FontSize::SM)
-                        .color(Theme::TEXT_MUTED),
+                    RichText::new(tr(
+                        &ui_language,
+                        "Open CodexBar from anywhere with this shortcut",
+                        "按下此快捷键可在任意位置打开 CodexBar",
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
                 );
             });
 
@@ -3741,6 +3837,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
 /// Render Display tab for viewport
 fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
+    let ui_language = current_ui_language(shared_state);
     section_header(ui, "Appearance");
 
     settings_card(ui, |ui| {
@@ -3752,8 +3849,12 @@ fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Relative time",
-            "Show reset time as relative (3h 45m) instead of absolute",
+            tr(&ui_language, "Relative time", "相对时间"),
+            tr(
+                &ui_language,
+                "Show reset time as relative (3h 45m) instead of absolute",
+                "显示重置时间为相对时间（3h 45m）而不是绝对时间",
+            ),
             &mut relative_time,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3772,8 +3873,12 @@ fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "Surprise animations",
-            "Show occasional fun animations in the tray icon",
+            tr(&ui_language, "Surprise animations", "趣味动画"),
+            tr(
+                &ui_language,
+                "Show occasional fun animations in the tray icon",
+                "在托盘图标中偶尔显示趣味动画",
+            ),
             &mut surprise,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -4071,8 +4176,7 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                             let value = state.new_api_key_value.trim().to_string();
                             state.api_keys.set(&provider, &value, None);
                             if let Err(e) = state.api_keys.save() {
-                                state.api_key_status_msg =
-                                    Some((format!("保存失败：{}", e), true));
+                                state.api_key_status_msg = Some((format!("保存失败：{}", e), true));
                             } else {
                                 state.api_key_status_msg =
                                     Some((format!("已保存 {} 的 API key", provider_name), false));
@@ -4109,12 +4213,17 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
 
 /// Render Cookies tab for viewport
 fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
+    let ui_language = current_ui_language(shared_state);
     section_header(ui, "Browser Cookies");
 
     ui.label(
-        RichText::new("Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。")
-            .size(FontSize::SM)
-            .color(Theme::TEXT_MUTED),
+        RichText::new(tr(
+            &ui_language,
+            "Cookies are automatically extracted from Chrome, Edge, Brave, and Firefox.",
+            "Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。",
+        ))
+        .size(FontSize::SM)
+        .color(Theme::TEXT_MUTED),
     );
 
     ui.add_space(Spacing::LG);
@@ -4159,7 +4268,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                     );
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if small_button(ui, "Remove", Theme::RED) {
+                        if small_button(ui, tr(&ui_language, "Remove", "移除"), Theme::RED) {
                             to_remove = Some(cookie_info.provider_id.clone());
                         }
                     });
@@ -4174,8 +4283,14 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 if let Ok(mut state) = shared_state.lock() {
                     state.cookies.remove(&provider_id);
                     let _ = state.cookies.save();
-                    state.cookie_status_msg =
-                        Some((format!("已移除 {} 的 Cookie", provider_id), false));
+                    state.cookie_status_msg = Some((
+                        format!(
+                            "{} {}",
+                            tr(&ui_language, "Removed cookie for", "已移除"),
+                            provider_id
+                        ),
+                        false,
+                    ));
                 }
             }
         });
@@ -4197,14 +4312,14 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         // Provider selection row
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("Provider")
+                RichText::new(tr(&ui_language, "Provider", "服务商"))
                     .size(FontSize::MD)
                     .color(Theme::TEXT_PRIMARY),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let combo = egui::ComboBox::from_id_salt("cookie_provider_viewport")
                     .selected_text(if current_provider.is_empty() {
-                        "Select..."
+                        tr(&ui_language, "Select...", "请选择...")
                     } else {
                         &current_provider
                     })
@@ -4236,7 +4351,7 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         // Cookie header label
         ui.label(
-            RichText::new("Cookie 头")
+            RichText::new(tr(&ui_language, "Cookie header", "Cookie 头"))
                 .size(FontSize::MD)
                 .color(Theme::TEXT_PRIMARY),
         );
@@ -4260,7 +4375,11 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                     .desired_width(ui.available_width())
                     .desired_rows(4)
                     .frame(false)
-                    .hint_text("Paste cookie header from browser dev tools");
+                    .hint_text(tr(
+                        &ui_language,
+                        "Paste cookie header from browser dev tools",
+                        "粘贴浏览器开发者工具中的 Cookie 头",
+                    ));
                 let response = ui.add(text_edit);
 
                 if response.changed() {
@@ -4287,13 +4406,15 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         if ui
             .add_enabled(
                 can_save,
-                egui::Button::new(RichText::new("保存 Cookie").size(FontSize::SM).color(
-                    if can_save {
-                        Color32::WHITE
-                    } else {
-                        Theme::TEXT_MUTED
-                    },
-                ))
+                egui::Button::new(
+                    RichText::new(tr(&ui_language, "Save Cookie", "保存 Cookie"))
+                        .size(FontSize::SM)
+                        .color(if can_save {
+                            Color32::WHITE
+                        } else {
+                            Theme::TEXT_MUTED
+                        }),
+                )
                 .fill(if can_save {
                     Theme::ACCENT_PRIMARY
                 } else {
@@ -4314,13 +4435,22 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 let value = state.new_cookie_value.clone();
                 state.cookies.set(&provider, &value);
                 if let Err(e) = state.cookies.save() {
-                    state.cookie_status_msg = Some((format!("保存失败：{}", e), true));
+                    state.cookie_status_msg = Some((
+                        format!("{}: {}", tr(&ui_language, "Save failed", "保存失败"), e),
+                        true,
+                    ));
                 } else {
                     let provider_name = ProviderId::from_cli_name(&provider)
                         .map(|id| id.display_name().to_string())
                         .unwrap_or_else(|| provider.clone());
-                    state.cookie_status_msg =
-                        Some((format!("已保存 {} 的 Cookie", provider_name), false));
+                    state.cookie_status_msg = Some((
+                        format!(
+                            "{} {}",
+                            tr(&ui_language, "Saved cookie for", "已保存"),
+                            provider_name
+                        ),
+                        false,
+                    ));
                     state.new_cookie_provider.clear();
                     state.new_cookie_value.clear();
                 }
@@ -4331,12 +4461,13 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
 /// Render Advanced tab for viewport
 fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
+    let ui_language = current_ui_language(shared_state);
     section_header(ui, "Refresh");
 
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("自动刷新间隔")
+                RichText::new(tr(&ui_language, "Auto-refresh interval", "自动刷新间隔"))
                     .size(FontSize::MD)
                     .color(Theme::TEXT_PRIMARY),
             );
@@ -4349,7 +4480,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                 };
 
                 let intervals = [
-                    (0, "从不"),
+                    (0, tr(&ui_language, "Never", "从不")),
                     (30, "30 sec"),
                     (60, "1 min"),
                     (300, "5 min"),
@@ -4360,7 +4491,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
                     .iter()
                     .find(|(v, _)| *v == current_interval)
                     .map(|(_, l)| *l)
-                    .unwrap_or("自定义");
+                    .unwrap_or(tr(&ui_language, "Custom", "自定义"));
 
                 // Style combobox to match theme
                 ui.style_mut().visuals.widgets.inactive.bg_fill = Theme::BG_TERTIARY;
@@ -4393,7 +4524,8 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
 }
 
 /// Render About tab for viewport
-fn render_about_tab(ui: &mut egui::Ui) {
+fn render_about_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
+    let ui_language = current_ui_language(shared_state);
     ui.vertical_centered(|ui| {
         ui.add_space(Spacing::XL);
 
@@ -4414,18 +4546,26 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
         // Version
         ui.label(
-            RichText::new(format!("版本 {}", env!("CARGO_PKG_VERSION")))
-                .size(FontSize::MD)
-                .color(Theme::TEXT_SECONDARY),
+            RichText::new(format!(
+                "{} {}",
+                tr(&ui_language, "Version", "版本"),
+                env!("CARGO_PKG_VERSION")
+            ))
+            .size(FontSize::MD)
+            .color(Theme::TEXT_SECONDARY),
         );
 
         ui.add_space(Spacing::SM);
 
         // Tagline
         ui.label(
-            RichText::new("监控 AI 服务商用量限制")
-                .size(FontSize::SM)
-                .color(Theme::TEXT_MUTED),
+            RichText::new(tr(
+                &ui_language,
+                "Monitor AI provider usage limits",
+                "监控 AI 服务商用量限制",
+            ))
+            .size(FontSize::SM)
+            .color(Theme::TEXT_MUTED),
         );
 
         ui.add_space(Spacing::XL);
@@ -4436,9 +4576,13 @@ fn render_about_tab(ui: &mut egui::Ui) {
     settings_card(ui, |ui| {
         ui.vertical(|ui| {
             ui.label(
-                RichText::new("由 CodexBar 贡献者维护")
-                    .size(FontSize::SM)
-                    .color(Theme::TEXT_PRIMARY),
+                RichText::new(tr(
+                    &ui_language,
+                    "Maintained by CodexBar contributors",
+                    "由 CodexBar 贡献者维护",
+                ))
+                .size(FontSize::SM)
+                .color(Theme::TEXT_PRIMARY),
             );
             ui.add_space(Spacing::XS);
             ui.label(
@@ -4455,11 +4599,19 @@ fn render_about_tab(ui: &mut egui::Ui) {
     section_header(ui, "Links");
     settings_card(ui, |ui| {
         ui.vertical(|ui| {
-            if text_button(ui, "→ 查看 GitHub", Theme::ACCENT_PRIMARY) {
+            if text_button(
+                ui,
+                tr(&ui_language, "-> View GitHub", "→ 查看 GitHub"),
+                Theme::ACCENT_PRIMARY,
+            ) {
                 let _ = open::that("https://github.com/Finesssee/Win-CodexBar");
             }
             ui.add_space(Spacing::XS);
-            if text_button(ui, "→ 提交问题", Theme::ACCENT_PRIMARY) {
+            if text_button(
+                ui,
+                tr(&ui_language, "-> Report an issue", "→ 提交问题"),
+                Theme::ACCENT_PRIMARY,
+            ) {
                 let _ = open::that("https://github.com/Finesssee/Win-CodexBar/issues");
             }
         });
@@ -4476,7 +4628,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("提交:")
+                    RichText::new(tr(&ui_language, "Commit:", "提交:"))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -4492,7 +4644,7 @@ fn render_about_tab(ui: &mut egui::Ui) {
 
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("构建:")
+                    RichText::new(tr(&ui_language, "Build:", "构建:"))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -4592,33 +4744,7 @@ fn section_header(ui: &mut egui::Ui, text: &str) {
 }
 
 fn zh_section_label(text: &str) -> &str {
-    match text {
-        "Startup" => "启动",
-        "Notifications" => "通知",
-        "Info" => "信息",
-        "Usage" => "用量",
-        "Quick Actions" => "快捷操作",
-        "Browser Cookie Import" => "浏览器 Cookie 导入",
-        "Usage Display" => "用量显示",
-        "Tray Icon" => "托盘图标",
-        "API Keys" => "API 密钥",
-        "Browser Cookies" => "浏览器 Cookie",
-        "Saved Cookies" => "已保存 Cookies",
-        "Add Manual Cookie" => "添加手动 Cookie",
-        "Refresh" => "刷新",
-        "Animations" => "动画",
-        "Menu Bar" => "菜单栏",
-        "Fun" => "趣味",
-        "Privacy" => "隐私",
-        "Updates" => "更新",
-        "Keyboard Shortcuts" => "快捷键",
-        "Appearance" => "外观",
-        "Credits" => "鸣谢",
-        "Links" => "链接",
-        "Build Info" => "构建信息",
-        "Enabled Providers" => "已启用服务商",
-        _ => text,
-    }
+    text
 }
 
 /// Settings card container - grouped settings with rounded corners and border
