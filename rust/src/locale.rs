@@ -296,6 +296,23 @@ pub enum LocaleKey {
     TrayProviderRefresh,
     TrayProviderSettings,
     TrayProviderQuit,
+
+    // Main popup - Usage/reset labels (were hardcoded in app.rs)
+    ResetInProgress,
+    TomorrowAt,
+    UsedPercent,
+    RemainingPercent,
+    RemainingAmount,
+    Tokens1K,
+    TodayCost,
+    Last30DaysCost,
+    StatusLabel,
+
+    // Main popup - Update banner messages (non-happy-path)
+    UpdateAvailableMessage,
+    UpdateReadyMessage,
+    UpdateFailedMessage,
+    UpdateDownloadingMessage,
 }
 
 impl LocaleKey {
@@ -509,6 +526,23 @@ impl LocaleKey {
             LocaleKey::TrayStatusPartial => " (Partial outage)",
             LocaleKey::TrayWeeklyExhausted => "Weekly quota exhausted",
             LocaleKey::TrayCreditsRemaining => "Credits remaining {}%",
+
+            // Main popup - Usage/reset labels
+            LocaleKey::ResetInProgress => "Resetting...",
+            LocaleKey::TomorrowAt => "Tomorrow at {}",
+            LocaleKey::UsedPercent => "{:.0}% used",
+            LocaleKey::RemainingPercent => "{:.0}% remaining",
+            LocaleKey::RemainingAmount => "{:.2} remaining",
+            LocaleKey::Tokens1K => "1K tokens",
+            LocaleKey::TodayCost => "Today: ${:.2}",
+            LocaleKey::Last30DaysCost => "Last 30 days: ${:.2}",
+            LocaleKey::StatusLabel => "Status: {}",
+
+            // Main popup - Update banner messages
+            LocaleKey::UpdateAvailableMessage => "Update available: {}",
+            LocaleKey::UpdateReadyMessage => "{} ready to install",
+            LocaleKey::UpdateFailedMessage => "Update failed: {}",
+            LocaleKey::UpdateDownloadingMessage => "Downloading {} ({:.0}%)",
 
             // Tray - Per-provider mode
             LocaleKey::TrayProviderOpen => "Open CodexBar",
@@ -725,6 +759,23 @@ impl LocaleKey {
             LocaleKey::TrayWeeklyExhausted => "周额度已用尽",
             LocaleKey::TrayCreditsRemaining => "剩余额度 {}%",
 
+            // Main popup - Usage/reset labels
+            LocaleKey::ResetInProgress => "正在重置...",
+            LocaleKey::TomorrowAt => "明天 {}",
+            LocaleKey::UsedPercent => "已使用 {:.0}%",
+            LocaleKey::RemainingPercent => "剩余 {:.0}%",
+            LocaleKey::RemainingAmount => "剩余 {:.2}",
+            LocaleKey::Tokens1K => "1K tokens",
+            LocaleKey::TodayCost => "今日：${:.2}",
+            LocaleKey::Last30DaysCost => "近 30 天：${:.2}",
+            LocaleKey::StatusLabel => "状态：{}",
+
+            // Main popup - Update banner messages
+            LocaleKey::UpdateAvailableMessage => "有可用更新：{}",
+            LocaleKey::UpdateReadyMessage => "{} 准备安装",
+            LocaleKey::UpdateFailedMessage => "更新失败：{}",
+            LocaleKey::UpdateDownloadingMessage => "正在下载 {} ({:.0}%)",
+
             // Tray - Per-provider mode
             LocaleKey::TrayProviderOpen => "打开 CodexBar",
             LocaleKey::TrayProviderRefresh => "刷新",
@@ -857,6 +908,21 @@ mod tests {
             // Main popup - Section titles
             LocaleKey::SectionUsageBreakdown,
             LocaleKey::SectionCost,
+            // Main popup - Usage/reset labels
+            LocaleKey::ResetInProgress,
+            LocaleKey::TomorrowAt,
+            LocaleKey::UsedPercent,
+            LocaleKey::RemainingPercent,
+            LocaleKey::RemainingAmount,
+            LocaleKey::Tokens1K,
+            LocaleKey::TodayCost,
+            LocaleKey::Last30DaysCost,
+            LocaleKey::StatusLabel,
+            // Main popup - Update banner messages
+            LocaleKey::UpdateAvailableMessage,
+            LocaleKey::UpdateReadyMessage,
+            LocaleKey::UpdateFailedMessage,
+            LocaleKey::UpdateDownloadingMessage,
         ];
 
         for key in keys {

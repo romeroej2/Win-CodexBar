@@ -305,7 +305,7 @@ impl PreferencesWindow {
         let mut builder = egui::ViewportBuilder::default()
             .with_title(locale_text(
                 self.settings.ui_language,
-                LocaleKey::AboutTitle,
+                LocaleKey::MenuSettings,
             ))
             .with_inner_size([settings_size.x, settings_size.y])
             .with_min_inner_size([settings_min_size.x, settings_min_size.y])
@@ -3360,6 +3360,44 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
     } else {
         Language::English
     };
+
+    // LANGUAGE section - at the top of General tab
+    section_header(ui, locale_text(ui_language, LocaleKey::InterfaceLanguage));
+
+    settings_card(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new(locale_text(ui_language, LocaleKey::InterfaceLanguage))
+                    .size(FontSize::MD)
+                    .color(Theme::TEXT_PRIMARY),
+            );
+            ui.add_space(Spacing::MD);
+
+            // Language selector ComboBox
+            let current_language = if let Ok(state) = shared_state.lock() {
+                state.settings.ui_language
+            } else {
+                Language::English
+            };
+            let current_label = current_language.display_name();
+
+            egui::ComboBox::from_id_salt("language_selector_viewport")
+                .selected_text(current_label)
+                .show_ui(ui, |ui| {
+                    for lang in Language::all() {
+                        let is_selected = current_language == *lang;
+                        if ui.selectable_label(is_selected, lang.display_name()).clicked() {
+                            if let Ok(mut state) = shared_state.lock() {
+                                state.settings.ui_language = *lang;
+                                state.settings_changed = true;
+                            }
+                        }
+                    }
+                });
+        });
+    });
+
+    ui.add_space(Spacing::LG);
 
     section_header(ui, locale_text(ui_language, LocaleKey::StartupSettings));
 

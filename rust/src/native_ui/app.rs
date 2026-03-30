@@ -133,6 +133,7 @@ impl ProviderData {
         result: &ProviderFetchResult,
         metadata: &crate::core::ProviderMetadata,
         reset_time_relative: bool,
+        ui_language: Language,
     ) -> Self {
         let snapshot = &result.usage;
         let (pace_percent, pace_lasts) = calculate_pace(&snapshot.primary);
@@ -163,11 +164,11 @@ impl ProviderData {
             session_reset: snapshot
                 .primary
                 .resets_at
-                .map(|t| format_reset_time(t, reset_time_relative)),
+                .map(|t| format_reset_time(t, reset_time_relative, ui_language)),
             weekly_percent: snapshot.secondary.as_ref().map(|s| s.used_percent),
             weekly_reset: snapshot.secondary.as_ref().and_then(|s| {
                 s.resets_at
-                    .map(|t| format_reset_time(t, reset_time_relative))
+                    .map(|t| format_reset_time(t, reset_time_relative, ui_language))
             }),
             model_percent: snapshot.model_specific.as_ref().map(|m| m.used_percent),
             model_name: snapshot
@@ -261,13 +262,13 @@ impl ProviderData {
     }
 }
 
-fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> String {
+fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool, lang: Language) -> String {
     if relative {
         let now = chrono::Utc::now();
         let diff = reset - now;
 
         if diff.num_seconds() <= 0 {
-            return "正在重置...".to_string();
+            return locale_text(lang, LocaleKey::ResetInProgress).to_string();
         }
 
         let hours = diff.num_hours();
@@ -291,7 +292,8 @@ fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> St
         if reset_date == today {
             local_time.format("%I:%M %p").to_string()
         } else if reset_date == today + chrono::Days::new(1) {
-            format!("明天 {}", local_time.format("%I:%M %p"))
+            let tomorrow_template = locale_text(lang, LocaleKey::TomorrowAt);
+            format!("{}", tomorrow_template.replace("{}", &local_time.format("%I:%M %p").to_string()))
         } else {
             local_time.format("%b %d, %I:%M %p").to_string()
         }
@@ -338,11 +340,11 @@ fn usage_display_percent(used_percent: f64, show_as_used: bool) -> f64 {
     }
 }
 
-fn usage_display_label(display_percent: f64, show_as_used: bool) -> String {
+fn usage_display_label(display_percent: f64, show_as_used: bool, lang: Language) -> String {
     if show_as_used {
-        format!("已使用 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::UsedPercent).replace("{:.0}", &format!("{:.0}", display_percent))
     } else {
-        format!("剩余 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::RemainingPercent).replace("{:.0}", &format!("{:.0}", display_percent))
     }
 }
 
@@ -797,6 +799,7 @@ impl CodexBarApp {
         let manual_cookies = ManualCookies::load();
         let api_keys = ApiKeys::load();
         let reset_time_relative = self.settings.reset_time_relative;
+        let ui_language = self.settings.ui_language;
         // Load token accounts for account switching support
         let token_accounts = TokenAccountStore::new().load().unwrap_or_default();
 
@@ -924,6 +927,7 @@ impl CodexBarApp {
                                     &result,
                                     &metadata,
                                     reset_time_relative,
+                                    ui_language,
                                 ),
                                 Ok(Err(e)) => ProviderData::from_error(id, e.to_string()),
                                 Err(_) => ProviderData::from_error(id, "Timeout".to_string()),
@@ -1453,18 +1457,23 @@ impl eframe::App for CodexBarApp {
                                         ui.add_space(Spacing::XS);
 
                                         // Message based on state
+                                        let ui_lang = self.settings.ui_language;
                                         let message = match &update_download_state {
                                             UpdateState::Downloading(progress) => {
-                                                format!("Downloading {} ({:.0}%)", update.version, progress * 100.0)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateDownloadingMessage);
+                                                template.replace("{}", &update.version).replace("{:.0}", &format!("{:.0}", progress * 100.0))
                                             }
                                             UpdateState::Ready(_) => {
-                                                format!("Update {} ready to install", update.version)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateReadyMessage);
+                                                template.replace("{}", &update.version)
                                             }
                                             UpdateState::Failed(e) => {
-                                                format!("Update failed: {}", e)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateFailedMessage);
+                                                template.replace("{}", e)
                                             }
                                             _ => {
-                                                format!("Update available: {}", update.version)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateAvailableMessage);
+                                                template.replace("{}", &update.version)
                                             }
                                         };
                                         ui.label(
@@ -2004,8 +2013,9 @@ fn draw_provider_detail_card(
                         ui.add_space(2.0);
                         ui.horizontal(|ui| {
                             let status_col = status_color(provider.status_level);
+                            let status_template = locale_text(ui_language, LocaleKey::StatusLabel);
                             ui.label(
-                                RichText::new(format!("状态：{}", status_desc))
+                                RichText::new(status_template.replace("{}", status_desc))
                                     .size(FontSize::XS)
                                     .color(status_col),
                             );
@@ -2149,14 +2159,15 @@ fn draw_provider_detail_card(
                 // Info row: X left (left) | 1K tokens (right) - .font(.caption)
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
+                    let remaining_template = locale_text(ui_language, LocaleKey::RemainingAmount);
                     ui.label(
-                        RichText::new(format!("剩余 {:.2}", credits))
+                        RichText::new(remaining_template.replace("{:.2}", &format!("{:.2}", credits)))
                             .size(FontSize::XS)
                             .color(Theme::TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
-                            RichText::new("1K tokens")
+                            RichText::new(locale_text(ui_language, LocaleKey::Tokens1K))
                                 .size(FontSize::XS)
                                 .color(Theme::TEXT_SECONDARY),
                         );
@@ -2235,13 +2246,15 @@ fn draw_provider_detail_card(
                 let total_30d: f64 = provider.cost_history.iter().map(|(_, cost)| cost).sum();
                 let today_cost: f64 = provider.cost_history.last().map(|(_, c)| *c).unwrap_or(0.0);
 
+                let today_template = locale_text(ui_language, LocaleKey::TodayCost);
+                let total30d_template = locale_text(ui_language, LocaleKey::Last30DaysCost);
                 ui.label(
-                    RichText::new(format!("今日：${:.2}", today_cost))
+                    RichText::new(today_template.replace("{:.2}", &format!("{:.2}", today_cost)))
                         .size(FontSize::XS)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new(format!("近 30 天：${:.2}", total_30d))
+                    RichText::new(total30d_template.replace("{:.2}", &format!("{:.2}", total_30d)))
                         .size(FontSize::XS)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -2460,7 +2473,7 @@ fn draw_metric_row(
     // Info row: X% used (left) | Pace status | Resets in Xh (right) - .font(.footnote)
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(usage_display_label(display_percent, show_as_used))
+            RichText::new(usage_display_label(display_percent, show_as_used, ui_language))
                 .size(FontSize::XS)
                 .color(Theme::TEXT_PRIMARY),
         );

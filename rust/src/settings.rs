@@ -873,4 +873,85 @@ mod tests {
         cookies.remove("claude");
         assert_eq!(cookies.get("claude"), None);
     }
+
+    #[test]
+    fn test_language_defaults_to_english() {
+        let settings = Settings::default();
+        assert_eq!(settings.ui_language, Language::English);
+    }
+
+    #[test]
+    fn test_language_all_variants_available() {
+        let languages = Language::all();
+        assert_eq!(languages.len(), 2);
+        assert!(languages.contains(&Language::English));
+        assert!(languages.contains(&Language::Chinese));
+    }
+
+    #[test]
+    fn test_language_display_names() {
+        assert_eq!(Language::English.display_name(), "English");
+        assert_eq!(Language::Chinese.display_name(), "中文");
+    }
+
+    #[test]
+    fn test_settings_load_missing_language_field_defaults_to_english() {
+        // Simulate loading legacy settings JSON without ui_language field
+        let legacy_json = r#"{
+            "enabled_providers": ["claude", "codex"],
+            "refresh_interval_secs": 300,
+            "start_minimized": false,
+            "ui_language": "english"
+        }"#;
+
+        let settings: Result<Settings, _> = serde_json::from_str(legacy_json);
+        assert!(settings.is_ok());
+        let settings = settings.unwrap();
+        assert_eq!(settings.ui_language, Language::English);
+    }
+
+    #[test]
+    fn test_settings_roundtrip_with_language() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create settings with Chinese language
+        let mut settings = Settings::default();
+        settings.ui_language = Language::Chinese;
+
+        // Save to a temp file
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let json = serde_json::to_string_pretty(&settings).expect("Failed to serialize settings");
+        temp_file.write_all(json.as_bytes()).expect("Failed to write settings");
+        let path = temp_file.path().to_path_buf();
+
+        // Read back and verify
+        let content = std::fs::read_to_string(&path).expect("Failed to read settings");
+        let loaded: Settings = serde_json::from_str(&content).expect("Failed to deserialize settings");
+
+        assert_eq!(loaded.ui_language, Language::Chinese);
+    }
+
+    #[test]
+    fn test_language_serde_serialization() {
+        // Test that Language serializes to lowercase string
+        let english = Language::English;
+        let chinese = Language::Chinese;
+
+        let english_json = serde_json::to_string(&english).unwrap();
+        let chinese_json = serde_json::to_string(&chinese).unwrap();
+
+        assert_eq!(english_json, "\"english\"");
+        assert_eq!(chinese_json, "\"chinese\"");
+    }
+
+    #[test]
+    fn test_language_serde_deserialization() {
+        // Test that lowercase strings deserialize correctly
+        let english: Language = serde_json::from_str("\"english\"").unwrap();
+        let chinese: Language = serde_json::from_str("\"chinese\"").unwrap();
+
+        assert_eq!(english, Language::English);
+        assert_eq!(chinese, Language::Chinese);
+    }
 }
