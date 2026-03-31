@@ -71,6 +71,8 @@ This launches the system tray application:
 - Use the Cookies, API Keys, or provider account sections to recover credentials if status stops updating
 - Use the About button for version info
 
+On Windows Remote Desktop sessions, CodexBar now exits with a direct error dialog instead of crashing with renderer errors. Use the local Windows desktop session for the native UI, or run CLI commands like `codexbar usage -p claude` while connected over RDP.
+
 ### CLI Mode
 
 ```powershell

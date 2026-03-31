@@ -74,6 +74,48 @@ fn show_main_window_no_focus() {}
 #[cfg(not(windows))]
 fn restore_main_window() {}
 
+#[cfg(windows)]
+fn is_remote_session() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_REMOTESESSION};
+
+    unsafe { GetSystemMetrics(SM_REMOTESESSION) != 0 }
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn remote_session_error_message() -> &'static str {
+    "CodexBar can't render its native window inside a Windows Remote Desktop session on this machine.\n\nRun it from the local desktop session instead, or use the CLI while connected over RDP:\n\n  codexbar usage -p claude\n\nThe startup log is written to %TEMP%\\codexbar_launch.log."
+}
+
+#[cfg(windows)]
+fn show_remote_session_error_dialog() {
+    use windows::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
+    use windows::core::{HSTRING, w};
+
+    let message = HSTRING::from(remote_session_error_message());
+
+    unsafe {
+        let _ = MessageBoxW(None, &message, w!("CodexBar"), MB_OK | MB_ICONERROR);
+    }
+}
+
+fn build_native_options() -> eframe::NativeOptions {
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size([360.0, 500.0])
+        .with_min_inner_size([320.0, 320.0])
+        .with_clamp_size_to_monitor_size(true)
+        .with_resizable(true)
+        .with_decorations(true)
+        .with_transparent(false)
+        .with_always_on_top()
+        .with_title("CodexBar");
+
+    eframe::NativeOptions {
+        viewport,
+        persist_window: false, // Don't persist window state
+        ..Default::default()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ProviderData {
     pub name: String,
@@ -2605,6 +2647,12 @@ fn draw_menu_item(ui: &mut egui::Ui, icon: &str, label: &str) -> bool {
 
 /// Run the application
 pub fn run() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    if is_remote_session() {
+        show_remote_session_error_dialog();
+        anyhow::bail!(remote_session_error_message());
+    }
+
     // Delete any corrupted window state
     if let Some(data_dir) = dirs::data_dir() {
         let state_file = data_dir.join("CodexBar").join("data").join("app.ron");
@@ -2613,19 +2661,7 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([360.0, 500.0])
-            .with_min_inner_size([320.0, 320.0])
-            .with_clamp_size_to_monitor_size(true)
-            .with_resizable(true)
-            .with_decorations(true)
-            .with_transparent(false)
-            .with_always_on_top()
-            .with_title("CodexBar"),
-        persist_window: false, // Don't persist window state
-        ..Default::default()
-    };
+    let options = build_native_options();
 
     eframe::run_native(
         "CodexBar",
@@ -2635,4 +2671,18 @@ pub fn run() -> anyhow::Result<()> {
     .map_err(|e| anyhow::anyhow!("eframe error: {}", e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remote_session_error_message;
+
+    #[test]
+    fn remote_session_error_mentions_cli_and_log() {
+        let message = remote_session_error_message();
+
+        assert!(message.contains("Remote Desktop"));
+        assert!(message.contains("codexbar usage -p claude"));
+        assert!(message.contains("%TEMP%\\codexbar_launch.log"));
+    }
 }
