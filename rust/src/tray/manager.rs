@@ -6,11 +6,11 @@
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::cell::{Cell, RefCell};
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use tray_icon::{
-    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
     Icon, TrayIcon, TrayIconBuilder,
+    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
 
 use super::icon::{LoadingPattern, UsageLevel};
@@ -629,10 +629,8 @@ impl MultiTrayManager {
 
             let icon = create_loading_icon(primary, secondary);
             let _ = tray_icon.set_icon(Some(icon));
-            let _ = tray_icon.set_tooltip(Some(&format!(
-                "{} - 加载中...",
-                provider_id.display_name()
-            )));
+            let _ =
+                tray_icon.set_tooltip(Some(&format!("{} - 加载中...", provider_id.display_name())));
         }
     }
 
@@ -669,7 +667,9 @@ impl UnifiedTrayManager {
     /// Create a new unified tray manager based on settings
     pub fn new(settings: &Settings, locale: &Locale) -> anyhow::Result<Self> {
         match settings.tray_icon_mode {
-            TrayIconMode::Single => Ok(UnifiedTrayManager::Single(TrayManager::new(settings, locale)?)),
+            TrayIconMode::Single => Ok(UnifiedTrayManager::Single(TrayManager::new(
+                settings, locale,
+            )?)),
             TrayIconMode::PerProvider => {
                 let mut multi = MultiTrayManager::new()?;
                 let enabled = settings.get_enabled_provider_ids();

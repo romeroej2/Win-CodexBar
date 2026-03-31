@@ -262,12 +262,13 @@ impl ProviderData {
 }
 
 fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> String {
+    let locale = Locale::load(Settings::load().language);
     if relative {
         let now = chrono::Utc::now();
         let diff = reset - now;
 
         if diff.num_seconds() <= 0 {
-            return "正在重置...".to_string();
+            return locale.t("app.resetting").to_string();
         }
 
         let hours = diff.num_hours();
@@ -291,7 +292,9 @@ fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> St
         if reset_date == today {
             local_time.format("%I:%M %p").to_string()
         } else if reset_date == today + chrono::Days::new(1) {
-            format!("明天 {}", local_time.format("%I:%M %p"))
+            locale
+                .t("app.tomorrow_at")
+                .replace("{time}", &local_time.format("%I:%M %p").to_string())
         } else {
             local_time.format("%b %d, %I:%M %p").to_string()
         }
@@ -338,11 +341,15 @@ fn usage_display_percent(used_percent: f64, show_as_used: bool) -> f64 {
     }
 }
 
-fn usage_display_label(display_percent: f64, show_as_used: bool) -> String {
+fn usage_display_label(locale: &Locale, display_percent: f64, show_as_used: bool) -> String {
     if show_as_used {
-        format!("已使用 {:.0}%", display_percent)
+        locale
+            .t("app.used_pct")
+            .replace("{pct}", &format!("{:.0}", display_percent))
     } else {
-        format!("剩余 {:.0}%", display_percent)
+        locale
+            .t("app.remaining_pct")
+            .replace("{pct}", &format!("{:.0}", display_percent))
     }
 }
 
@@ -1747,6 +1754,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    &self.locale,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1759,6 +1767,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    &self.locale,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1788,7 +1797,7 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(self.locale.t("app.loading"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1803,7 +1812,7 @@ impl eframe::App for CodexBarApp {
                                 .show(ui, |ui| {
                                     ui.vertical_centered(|ui| {
                                         ui.label(
-                                            RichText::new("暂无服务商数据。")
+                                            RichText::new(self.locale.t("app.no_data"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1823,18 +1832,18 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(self.locale.t("app.loading"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                     } else {
                                         ui.label(
-                                            RichText::new("尚未选择服务商。")
+                                            RichText::new(self.locale.t("app.no_provider"))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                         ui.add_space(Spacing::SM);
-                                        if ui.button("打开服务商设置").clicked() {
+                                        if ui.button(self.locale.t("app.open_settings")).clicked() {
                                             self.preferences_window.active_tab = super::preferences::PreferencesTab::Providers;
                                             self.preferences_window.open();
                                         }
@@ -1851,14 +1860,14 @@ impl eframe::App for CodexBarApp {
                     draw_horizontal_separator(ui, 0.0);
                     ui.add_space(4.0);
 
-                    if draw_text_menu_item(ui, "设置...") {
+                    if draw_text_menu_item(ui, self.locale.t("app.settings")) {
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "关于 CodexBar") {
+                    if draw_text_menu_item(ui, self.locale.t("app.about")) {
                         self.preferences_window.active_tab = super::preferences::PreferencesTab::About;
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "退出") {
+                    if draw_text_menu_item(ui, self.locale.t("app.quit")) {
                         std::process::exit(0);
                     }
                 }); // end ScrollArea
@@ -1887,7 +1896,9 @@ impl eframe::App for CodexBarApp {
                 if let Some(ref mut tray) = self.tray_manager {
                     match UnifiedTrayManager::new(&self.settings, &self.locale) {
                         Ok(new_tray) => *tray = new_tray,
-                        Err(e) => tracing::warn!("Failed to rebuild tray after language change: {}", e),
+                        Err(e) => {
+                            tracing::warn!("Failed to rebuild tray after language change: {}", e)
+                        }
                     }
                 }
             }
@@ -1920,6 +1931,7 @@ fn draw_provider_detail_card(
     show_credits_extra: bool,
     show_as_used: bool,
     hide_personal_info: bool,
+    locale: &Locale,
 ) -> (bool, Option<String>) {
     let mut refresh_requested = false;
     let mut account_switch_requested: Option<String> = None;
@@ -1979,7 +1991,7 @@ fn draw_provider_detail_card(
                         );
                     } else {
                         ui.label(
-                            RichText::new("刚刚更新")
+                            RichText::new(locale.t("app.just_updated"))
                                 .size(FontSize::XS)
                                 .color(Theme::TEXT_SECONDARY),
                         );
@@ -2007,9 +2019,11 @@ fn draw_provider_detail_card(
                         ui.horizontal(|ui| {
                             let status_col = status_color(provider.status_level);
                             ui.label(
-                                RichText::new(format!("状态：{}", status_desc))
-                                    .size(FontSize::XS)
-                                    .color(status_col),
+                                RichText::new(
+                                    locale.t("app.status_desc").replace("{desc}", status_desc),
+                                )
+                                .size(FontSize::XS)
+                                .color(status_col),
                             );
                         });
                     }
@@ -2041,7 +2055,7 @@ fn draw_provider_detail_card(
             if let Some(session_pct) = provider.session_percent {
                 draw_metric_row(
                     ui,
-                    "会话",
+                    locale.t("app.session"),
                     session_pct,
                     show_as_used,
                     provider.session_reset.as_deref(),
@@ -2049,6 +2063,7 @@ fn draw_provider_detail_card(
                     content_width,
                     None, // No pace for session
                     false,
+                    locale,
                 );
             }
 
@@ -2058,7 +2073,7 @@ fn draw_provider_detail_card(
 
                 draw_metric_row(
                     ui,
-                    "周度",
+                    locale.t("app.weekly"),
                     weekly_pct,
                     show_as_used,
                     provider.weekly_reset.as_deref(),
@@ -2066,6 +2081,7 @@ fn draw_provider_detail_card(
                     content_width,
                     provider.pace_percent,
                     provider.pace_lasts_to_reset,
+                    locale,
                 );
             }
 
@@ -2073,7 +2089,10 @@ fn draw_provider_detail_card(
             if let Some(model_pct) = provider.model_percent {
                 ui.add_space(12.0);
 
-                let model_label = provider.model_name.as_deref().unwrap_or("模型");
+                let model_label = provider
+                    .model_name
+                    .as_deref()
+                    .unwrap_or(locale.t("app.model"));
                 draw_metric_row(
                     ui,
                     model_label,
@@ -2084,6 +2103,7 @@ fn draw_provider_detail_card(
                     content_width,
                     None, // No pace for model
                     false,
+                    locale,
                 );
             }
 
@@ -2093,7 +2113,7 @@ fn draw_provider_detail_card(
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(
-                    RichText::new("无法获取用量")
+                    RichText::new(locale.t("app.no_usage"))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_SECONDARY),
                 );
@@ -2115,7 +2135,7 @@ fn draw_provider_detail_card(
 
                 // Title: "Credits" - .font(.body).fontWeight(.medium)
                 ui.label(
-                    RichText::new("额度")
+                    RichText::new(locale.t("app.credits"))
                         .size(FontSize::BASE)
                         .color(Theme::TEXT_PRIMARY)
                         .strong(),
@@ -2146,13 +2166,17 @@ fn draw_provider_detail_card(
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new(format!("剩余 {:.2}", credits))
-                            .size(FontSize::XS)
-                            .color(Theme::TEXT_PRIMARY),
+                        RichText::new(
+                            locale
+                                .t("app.credits_remaining")
+                                .replace("{amount}", &format!("{:.2}", credits)),
+                        )
+                        .size(FontSize::XS)
+                        .color(Theme::TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
-                            RichText::new("1K tokens")
+                            RichText::new(locale.t("app.credits_unit"))
                                 .size(FontSize::XS)
                                 .color(Theme::TEXT_SECONDARY),
                         );
@@ -2161,7 +2185,7 @@ fn draw_provider_detail_card(
 
                 // Buy Credits link
                 ui.add_space(6.0);
-                if draw_menu_item(ui, "⊕", "购买额度...") {
+                if draw_menu_item(ui, "⊕", locale.t("app.buy_credits")) {
                     if let Some(ref url) = provider.dashboard_url {
                         let _ = open::that(url);
                     }
@@ -2191,7 +2215,7 @@ fn draw_provider_detail_card(
             ui.add_space(12.0);
 
             ui.label(
-                RichText::new("用量明细")
+                RichText::new(locale.t("app.usage_detail"))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2214,7 +2238,7 @@ fn draw_provider_detail_card(
 
             // Title: "Cost" - .font(.body).fontWeight(.medium)
             ui.label(
-                RichText::new("费用")
+                RichText::new(locale.t("app.cost"))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2228,14 +2252,22 @@ fn draw_provider_detail_card(
                 let today_cost: f64 = provider.cost_history.last().map(|(_, c)| *c).unwrap_or(0.0);
 
                 ui.label(
-                    RichText::new(format!("今日：${:.2}", today_cost))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_PRIMARY),
+                    RichText::new(
+                        locale
+                            .t("app.today_cost")
+                            .replace("{amount}", &format!("{:.2}", today_cost)),
+                    )
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new(format!("近 30 天：${:.2}", total_30d))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_PRIMARY),
+                    RichText::new(
+                        locale
+                            .t("app.last30d_cost")
+                            .replace("{amount}", &format!("{:.2}", total_30d)),
+                    )
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_PRIMARY),
                 );
             } else if let Some(cost_used) = &provider.cost_used {
                 ui.label(
@@ -2273,7 +2305,7 @@ fn draw_provider_detail_card(
 
             // Vertical action links like macOS
             // Refresh button - first action
-            if draw_menu_item(ui, "↻", "刷新") {
+            if draw_menu_item(ui, "↻", locale.t("app.refresh")) {
                 refresh_requested = true;
             }
 
@@ -2281,7 +2313,7 @@ fn draw_provider_detail_card(
             if TokenAccountSupport::is_supported(
                 ProviderId::from_cli_name(&provider.name).unwrap_or(ProviderId::Claude),
             ) {
-                if draw_menu_item(ui, "->", "切换账号...") {
+                if draw_menu_item(ui, "->", locale.t("app.switch_account")) {
                     account_switch_requested = Some(provider.name.clone());
                 }
             }
@@ -2289,14 +2321,14 @@ fn draw_provider_detail_card(
             // Usage Dashboard link
             if let Some(ref url) = provider.dashboard_url {
                 let dashboard_url = url.clone();
-                if draw_menu_item(ui, "📊", "用量仪表盘") {
+                if draw_menu_item(ui, "📊", locale.t("app.dashboard")) {
                     let _ = open::that(&dashboard_url);
                 }
             }
 
             // Status Page link
             if let Some(status_url) = get_status_page_url(&provider.name) {
-                if draw_menu_item(ui, "⚡", "状态页面") {
+                if draw_menu_item(ui, "⚡", locale.t("app.status_page")) {
                     let _ = open::that(status_url);
                 }
             }
@@ -2304,7 +2336,7 @@ fn draw_provider_detail_card(
             // Copy Error link
             if let Some(ref error) = provider.error {
                 let error_text = error.clone();
-                if draw_menu_item(ui, "📋", "复制错误") {
+                if draw_menu_item(ui, "📋", locale.t("app.copy_error")) {
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
                         let _ = clipboard.set_text(&error_text);
                     }
@@ -2382,6 +2414,7 @@ fn draw_metric_row(
     _content_width: f32,
     pace_percent: Option<f64>,
     pace_lasts_to_reset: bool,
+    locale: &Locale,
 ) {
     // Title - .font(.body).fontWeight(.medium)
     ui.label(
@@ -2435,7 +2468,7 @@ fn draw_metric_row(
     // Info row: X% used (left) | Pace status | Resets in Xh (right) - .font(.footnote)
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(usage_display_label(display_percent, show_as_used))
+            RichText::new(usage_display_label(locale, display_percent, show_as_used))
                 .size(FontSize::XS)
                 .color(Theme::TEXT_PRIMARY),
         );
@@ -2444,9 +2477,9 @@ fn draw_metric_row(
         if display_pace_percent.is_some() {
             ui.add_space(8.0);
             let (pace_text, pace_color) = if pace_lasts_to_reset {
-                ("进度正常", Theme::GREEN)
+                (locale.t("app.on_track"), Theme::GREEN)
             } else {
-                ("进度滞后", Theme::YELLOW)
+                (locale.t("app.behind_pace"), Theme::YELLOW)
             };
             ui.label(
                 RichText::new(pace_text)
@@ -2458,7 +2491,7 @@ fn draw_metric_row(
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(reset) = reset_text {
                 ui.label(
-                    RichText::new(format!("重置于 {}", reset))
+                    RichText::new(locale.t("app.resets_at").replace("{time}", reset))
                         .size(FontSize::XS)
                         .color(Theme::TEXT_SECONDARY),
                 );

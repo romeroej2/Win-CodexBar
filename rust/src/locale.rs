@@ -3,8 +3,8 @@
 //! Provides translation lookup for all UI strings via the `Locale` struct.
 //! Translations are embedded as JSON at compile time.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 static EN_JSON: &str = include_str!("../locales/en.json");
 static ZH_CN_JSON: &str = include_str!("../locales/zh-CN.json");
@@ -25,7 +25,7 @@ impl Language {
     /// Used in the language selector dropdown so it's always readable.
     pub fn display_name(&self) -> &'static str {
         match self {
-            Language::ZhCn => "简体中文",
+            Language::ZhCn => "ç®€ä½“ä¸­æ–‡",
             Language::En => "English",
         }
     }
@@ -38,7 +38,6 @@ impl Language {
 
 /// Translation lookup system backed by embedded JSON files
 pub struct Locale {
-    lang: Language,
     map: HashMap<String, String>,
 }
 
@@ -51,24 +50,13 @@ impl Locale {
         };
         let map: HashMap<String, String> =
             serde_json::from_str(json).expect("locale JSON is always valid");
-        Self { lang, map }
+        Self { map }
     }
 
     /// Translate a key. Returns a static fallback string if not found.
     /// This allows showing missing translations during development.
     pub fn t(&self, key: &str) -> &str {
         self.map.get(key).map(|s| s.as_str()).unwrap_or("")
-    }
-
-    /// Translate a key and substitute a single `{placeholder}` with a value.
-    /// Example: `t("app.used_pct", "{pct}", "75")` → `"已使用 75%"`
-    pub fn tf(&self, key: &str, placeholder: &str, value: &str) -> String {
-        self.t(key).replace(placeholder, value)
-    }
-
-    /// Get the current language
-    pub fn language(&self) -> Language {
-        self.lang
     }
 }
 
@@ -79,14 +67,14 @@ mod tests {
     #[test]
     fn test_load_zh_cn() {
         let locale = Locale::load(Language::ZhCn);
-        assert!(locale.t("tray.open").len() > 0);
+        assert!(!locale.t("tray.open").is_empty());
         assert_ne!(locale.t("tray.open"), "tray.open");
     }
 
     #[test]
     fn test_load_en() {
         let locale = Locale::load(Language::En);
-        assert!(locale.t("tray.open").len() > 0);
+        assert!(!locale.t("tray.open").is_empty());
         assert_ne!(locale.t("tray.open"), "tray.open");
     }
 
@@ -99,7 +87,7 @@ mod tests {
     #[test]
     fn test_substitution() {
         let locale = Locale::load(Language::ZhCn);
-        let result = locale.tf("app.used_pct", "{pct}", "75");
+        let result = locale.t("app.used_pct").replace("{pct}", "75");
         assert!(!result.contains("{pct}"));
         assert!(result.contains("75"));
     }
