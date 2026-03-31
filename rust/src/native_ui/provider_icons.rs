@@ -3,11 +3,13 @@
 //! Loads provider brand icons from assets/icons/ directory.
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
+use image::ImageReader;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
 /// Static icon data embedded at compile time
 static ICON_DATA: OnceLock<HashMap<&'static str, &'static [u8]>> = OnceLock::new();
+static SUMMARY_ICON_PNG: &[u8] = include_bytes!("../../icons/icon.png");
 
 fn get_icon_data() -> &'static HashMap<&'static str, &'static [u8]> {
     ICON_DATA.get_or_init(|| {
@@ -131,6 +133,10 @@ fn normalize_provider_name(name: &str) -> String {
 
 /// Load and rasterize an SVG icon at the specified size
 fn load_provider_icon(ctx: &egui::Context, provider_key: &str, size: u32) -> Option<TextureHandle> {
+    if provider_key == "summary" {
+        return load_png_icon(ctx, provider_key, SUMMARY_ICON_PNG, size);
+    }
+
     let icon_data = get_icon_data();
     let svg_data = icon_data.get(provider_key)?;
 
@@ -166,6 +172,29 @@ fn load_provider_icon(ctx: &egui::Context, provider_key: &str, size: u32) -> Opt
     );
 
     Some(texture)
+}
+
+fn load_png_icon(
+    ctx: &egui::Context,
+    icon_key: &str,
+    png_data: &[u8],
+    size: u32,
+) -> Option<TextureHandle> {
+    let image = ImageReader::new(std::io::Cursor::new(png_data))
+        .with_guessed_format()
+        .ok()?
+        .decode()
+        .ok()?
+        .resize_exact(size, size, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
+
+    let image = ColorImage::from_rgba_unmultiplied([size as usize, size as usize], image.as_raw());
+
+    Some(ctx.load_texture(
+        format!("provider_icon_{}", icon_key),
+        image,
+        TextureOptions::LINEAR,
+    ))
 }
 
 /// Check if an icon exists for the given provider

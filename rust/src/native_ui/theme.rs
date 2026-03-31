@@ -235,6 +235,26 @@ impl Theme {
     pub fn button_gradient_bottom() -> Color32 {
         Color32::from_rgb(50, 120, 230)
     }
+
+    /// Frosted header background
+    pub fn glass_header_fill() -> Color32 {
+        Color32::from_rgba_unmultiplied(54, 58, 66, 210)
+    }
+
+    /// Glass highlight tint
+    pub fn glass_highlight() -> Color32 {
+        Color32::from_rgba_unmultiplied(255, 255, 255, 28)
+    }
+
+    /// Glass border tint
+    pub fn glass_border() -> Color32 {
+        Color32::from_rgba_unmultiplied(255, 255, 255, 36)
+    }
+
+    /// Subtle spotlight tint for glass surfaces
+    pub fn glass_spotlight() -> Color32 {
+        Color32::from_rgba_unmultiplied(120, 190, 255, 22)
+    }
 }
 
 use crate::status::StatusLevel;
