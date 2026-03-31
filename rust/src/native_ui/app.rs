@@ -2623,6 +2623,11 @@ pub fn run() -> anyhow::Result<()> {
             .with_transparent(false)
             .with_always_on_top()
             .with_title("CodexBar"),
+        renderer: if cfg!(target_os = "windows") {
+            eframe::Renderer::Wgpu
+        } else {
+            eframe::Renderer::Glow
+        },
         persist_window: false, // Don't persist window state
         ..Default::default()
     };
