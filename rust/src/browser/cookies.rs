@@ -331,7 +331,7 @@ impl CookieExtractor {
             // that could start a cookie value.
             let value_bytes = if plaintext.len() > 32 {
                 // Check if first 32 bytes are garbage (non-ASCII)
-                let has_garbage_prefix = plaintext[..32].iter().any(|&b| b > 127 || b < 32);
+                let has_garbage_prefix = plaintext[..32].iter().any(|&b| !(32..=127).contains(&b));
                 if has_garbage_prefix {
                     // Find where ASCII text starts (skip prefix)
                     let start = plaintext

@@ -136,14 +136,13 @@ impl TokenAccountSupport {
             }
             TokenInjection::CookieHeader => {
                 // Check for Claude OAuth token
-                if provider == ProviderId::Claude {
-                    if let Some(normalized) = Self::normalized_claude_oauth_token(token) {
-                        if Self::is_claude_oauth_token(&normalized) {
-                            let mut map = HashMap::new();
-                            map.insert("CODEXBAR_CLAUDE_OAUTH_TOKEN".to_string(), normalized);
-                            return Some(map);
-                        }
-                    }
+                if provider == ProviderId::Claude
+                    && let Some(normalized) = Self::normalized_claude_oauth_token(token)
+                    && Self::is_claude_oauth_token(&normalized)
+                {
+                    let mut map = HashMap::new();
+                    map.insert("CODEXBAR_CLAUDE_OAUTH_TOKEN".to_string(), normalized);
+                    return Some(map);
                 }
                 None
             }
@@ -236,7 +235,7 @@ impl TokenAccount {
 
     /// Get added_at as DateTime
     pub fn added_at_datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp(self.added_at, 0).unwrap_or_else(|| Utc::now())
+        DateTime::from_timestamp(self.added_at, 0).unwrap_or_else(Utc::now)
     }
 
     /// Get last_used as DateTime

@@ -352,12 +352,12 @@ impl CostUsagePricing {
         }
 
         // Handle nested model names like "anthropic.claude-sonnet-4.claude-sonnet-4-20250514"
-        if trimmed.contains("claude-") {
-            if let Some(last_dot) = trimmed.rfind('.') {
-                let tail = &trimmed[last_dot + 1..];
-                if tail.starts_with("claude-") {
-                    trimmed = tail.to_string();
-                }
+        if trimmed.contains("claude-")
+            && let Some(last_dot) = trimmed.rfind('.')
+        {
+            let tail = &trimmed[last_dot + 1..];
+            if tail.starts_with("claude-") {
+                trimmed = tail.to_string();
             }
         }
 

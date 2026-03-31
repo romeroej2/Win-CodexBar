@@ -305,11 +305,10 @@ impl NotificationManager {
                 body,
             ])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                tracing::debug!("Sent notification via notify-send: {}", title);
-                return;
-            }
+            tracing::debug!("Sent notification via notify-send: {}", title);
+            return;
         }
 
         tracing::info!("Notification: {} - {}", title, body);

@@ -210,10 +210,11 @@ fn find_account<'a>(
     account_ref: &str,
 ) -> anyhow::Result<&'a TokenAccount> {
     // Try parsing as index first (1-based)
-    if let Ok(idx) = account_ref.parse::<usize>() {
-        if idx > 0 && idx <= data.accounts.len() {
-            return Ok(&data.accounts[idx - 1]);
-        }
+    if let Ok(idx) = account_ref.parse::<usize>()
+        && idx > 0
+        && idx <= data.accounts.len()
+    {
+        return Ok(&data.accounts[idx - 1]);
     }
 
     // Try matching by label (case-insensitive)

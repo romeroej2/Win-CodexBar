@@ -57,10 +57,10 @@ impl ShortcutManager {
     /// Check if the open menu shortcut was triggered
     /// Call this in your event loop
     pub fn check_events(&self) -> bool {
-        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
-            if event.id == self.open_menu_id {
-                return true;
-            }
+        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv()
+            && event.id == self.open_menu_id
+        {
+            return true;
         }
         false
     }

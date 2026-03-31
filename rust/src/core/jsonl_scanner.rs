@@ -164,7 +164,7 @@ impl JsonlScanner {
                     let path = entry.path();
                     if path
                         .extension()
-                        .map_or(false, |e| e.eq_ignore_ascii_case("jsonl"))
+                        .is_some_and(|e| e.eq_ignore_ascii_case("jsonl"))
                     {
                         files.push(path);
                     }
@@ -244,108 +244,101 @@ impl JsonlScanner {
                         if let Some(payload) = obj.get("payload") {
                             if let Some(model) = payload.get("model").and_then(|v| v.as_str()) {
                                 current_model = Some(model.to_string());
-                            } else if let Some(info) = payload.get("info") {
-                                if let Some(model) = info.get("model").and_then(|v| v.as_str()) {
-                                    current_model = Some(model.to_string());
-                                }
+                            } else if let Some(info) = payload.get("info")
+                                && let Some(model) = info.get("model").and_then(|v| v.as_str())
+                            {
+                                current_model = Some(model.to_string());
                             }
                         }
-                    } else if msg_type == "event_msg" {
-                        if let Some(payload) = obj.get("payload") {
-                            if payload.get("type").and_then(|v| v.as_str()) != Some("token_count") {
-                                line.clear();
-                                continue;
-                            }
-
-                            let info = payload.get("info");
-
-                            // Get model
-                            let model = info
-                                .and_then(|i| i.get("model").or(i.get("model_name")))
-                                .or(payload.get("model"))
-                                .or(obj.get("model"))
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string())
-                                .or(current_model.clone())
-                                .unwrap_or_else(|| "gpt-5".to_string());
-
-                            // Calculate deltas
-                            let (delta_input, delta_cached, delta_output) = if let Some(total) =
-                                info.and_then(|i| i.get("total_token_usage"))
-                            {
-                                let input = total
-                                    .get("input_tokens")
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(0)
-                                    as i32;
-                                let cached = total
-                                    .get("cached_input_tokens")
-                                    .or(total.get("cache_read_input_tokens"))
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(0)
-                                    as i32;
-                                let output = total
-                                    .get("output_tokens")
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(0)
-                                    as i32;
-
-                                let delta_input = (input
-                                    - previous_totals.as_ref().map_or(0, |t| t.input))
-                                .max(0);
-                                let delta_cached = (cached
-                                    - previous_totals.as_ref().map_or(0, |t| t.cached))
-                                .max(0);
-                                let delta_output = (output
-                                    - previous_totals.as_ref().map_or(0, |t| t.output))
-                                .max(0);
-
-                                previous_totals = Some(CodexTotals {
-                                    input,
-                                    cached,
-                                    output,
-                                });
-
-                                (delta_input, delta_cached, delta_output)
-                            } else if let Some(last) = info.and_then(|i| i.get("last_token_usage"))
-                            {
-                                let input =
-                                    last.get("input_tokens")
-                                        .and_then(|v| v.as_i64())
-                                        .unwrap_or(0) as i32;
-                                let cached =
-                                    last.get("cached_input_tokens")
-                                        .or(last.get("cache_read_input_tokens"))
-                                        .and_then(|v| v.as_i64())
-                                        .unwrap_or(0) as i32;
-                                let output =
-                                    last.get("output_tokens")
-                                        .and_then(|v| v.as_i64())
-                                        .unwrap_or(0) as i32;
-
-                                (input.max(0), cached.max(0), output.max(0))
-                            } else {
-                                line.clear();
-                                continue;
-                            };
-
-                            if delta_input == 0 && delta_cached == 0 && delta_output == 0 {
-                                line.clear();
-                                continue;
-                            }
-
-                            // Normalize model name and add to days
-                            let norm_model = CostUsagePricing::normalize_codex_model(&model);
-                            let cached_clamp = delta_cached.min(delta_input);
-
-                            let day_models = days.entry(day_key.to_string()).or_default();
-                            let packed = day_models
-                                .entry(norm_model)
-                                .or_insert_with(|| vec![0, 0, 0]);
-                            packed[0] += delta_input;
-                            packed[1] += cached_clamp;
-                            packed[2] += delta_output;
+                    } else if msg_type == "event_msg"
+                        && let Some(payload) = obj.get("payload")
+                    {
+                        if payload.get("type").and_then(|v| v.as_str()) != Some("token_count") {
+                            line.clear();
+                            continue;
                         }
+
+                        let info = payload.get("info");
+
+                        // Get model
+                        let model = info
+                            .and_then(|i| i.get("model").or(i.get("model_name")))
+                            .or(payload.get("model"))
+                            .or(obj.get("model"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .or(current_model.clone())
+                            .unwrap_or_else(|| "gpt-5".to_string());
+
+                        // Calculate deltas
+                        let (delta_input, delta_cached, delta_output) = if let Some(total) =
+                            info.and_then(|i| i.get("total_token_usage"))
+                        {
+                            let input = total
+                                .get("input_tokens")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+                            let cached = total
+                                .get("cached_input_tokens")
+                                .or(total.get("cache_read_input_tokens"))
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+                            let output = total
+                                .get("output_tokens")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+
+                            let delta_input =
+                                (input - previous_totals.as_ref().map_or(0, |t| t.input)).max(0);
+                            let delta_cached =
+                                (cached - previous_totals.as_ref().map_or(0, |t| t.cached)).max(0);
+                            let delta_output =
+                                (output - previous_totals.as_ref().map_or(0, |t| t.output)).max(0);
+
+                            previous_totals = Some(CodexTotals {
+                                input,
+                                cached,
+                                output,
+                            });
+
+                            (delta_input, delta_cached, delta_output)
+                        } else if let Some(last) = info.and_then(|i| i.get("last_token_usage")) {
+                            let input = last
+                                .get("input_tokens")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+                            let cached = last
+                                .get("cached_input_tokens")
+                                .or(last.get("cache_read_input_tokens"))
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+                            let output = last
+                                .get("output_tokens")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0) as i32;
+
+                            (input.max(0), cached.max(0), output.max(0))
+                        } else {
+                            line.clear();
+                            continue;
+                        };
+
+                        if delta_input == 0 && delta_cached == 0 && delta_output == 0 {
+                            line.clear();
+                            continue;
+                        }
+
+                        // Normalize model name and add to days
+                        let norm_model = CostUsagePricing::normalize_codex_model(&model);
+                        let cached_clamp = delta_cached.min(delta_input);
+
+                        let day_models = days.entry(day_key.to_string()).or_default();
+                        let packed = day_models
+                            .entry(norm_model)
+                            .or_insert_with(|| vec![0, 0, 0]);
+                        packed[0] += delta_input;
+                        packed[1] += cached_clamp;
+                        packed[2] += delta_output;
                     }
                 }
             }
@@ -365,10 +358,10 @@ impl JsonlScanner {
     pub fn load_cache(provider: ProviderId, cache_root: Option<&Path>) -> CostUsageCache {
         let cache_path = Self::cache_path(provider, cache_root);
 
-        if let Ok(contents) = fs::read_to_string(&cache_path) {
-            if let Ok(cache) = serde_json::from_str(&contents) {
-                return cache;
-            }
+        if let Ok(contents) = fs::read_to_string(&cache_path)
+            && let Ok(cache) = serde_json::from_str(&contents)
+        {
+            return cache;
         }
 
         CostUsageCache::default()

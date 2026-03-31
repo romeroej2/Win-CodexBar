@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::wsl;
 
@@ -74,7 +74,7 @@ impl BrowserProfile {
     }
 
     /// Get the Local State file path (contains encryption key)
-    pub fn local_state_path(&self, user_data_dir: &PathBuf) -> PathBuf {
+    pub fn local_state_path(&self, user_data_dir: &Path) -> PathBuf {
         user_data_dir.join("Local State")
     }
 }
@@ -135,37 +135,37 @@ impl BrowserDetector {
     /// Get the user data directory for a browser
     fn get_user_data_dir(browser_type: BrowserType) -> Option<PathBuf> {
         // In WSL, prefer Windows AppData paths when available
-        if wsl::is_wsl() {
-            if let Some(appdata_local) = wsl::windows_appdata_local() {
-                let path = match browser_type {
-                    BrowserType::Chrome => Some(
-                        appdata_local
-                            .join("Google")
-                            .join("Chrome")
-                            .join("User Data"),
-                    ),
-                    BrowserType::Edge => Some(
-                        appdata_local
-                            .join("Microsoft")
-                            .join("Edge")
-                            .join("User Data"),
-                    ),
-                    BrowserType::Brave => Some(
-                        appdata_local
-                            .join("BraveSoftware")
-                            .join("Brave-Browser")
-                            .join("User Data"),
-                    ),
-                    BrowserType::Arc => Some(appdata_local.join("Arc").join("User Data")),
-                    BrowserType::Chromium => Some(appdata_local.join("Chromium").join("User Data")),
-                    BrowserType::Firefox => wsl::windows_appdata_roaming()
-                        .map(|roaming| roaming.join("Mozilla").join("Firefox").join("Profiles")),
-                };
-                if let Some(ref p) = path {
-                    if p.exists() {
-                        return path;
-                    }
-                }
+        if wsl::is_wsl()
+            && let Some(appdata_local) = wsl::windows_appdata_local()
+        {
+            let path = match browser_type {
+                BrowserType::Chrome => Some(
+                    appdata_local
+                        .join("Google")
+                        .join("Chrome")
+                        .join("User Data"),
+                ),
+                BrowserType::Edge => Some(
+                    appdata_local
+                        .join("Microsoft")
+                        .join("Edge")
+                        .join("User Data"),
+                ),
+                BrowserType::Brave => Some(
+                    appdata_local
+                        .join("BraveSoftware")
+                        .join("Brave-Browser")
+                        .join("User Data"),
+                ),
+                BrowserType::Arc => Some(appdata_local.join("Arc").join("User Data")),
+                BrowserType::Chromium => Some(appdata_local.join("Chromium").join("User Data")),
+                BrowserType::Firefox => wsl::windows_appdata_roaming()
+                    .map(|roaming| roaming.join("Mozilla").join("Firefox").join("Profiles")),
+            };
+            if let Some(ref p) = path
+                && p.exists()
+            {
+                return path;
             }
         }
 

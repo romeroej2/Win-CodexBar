@@ -283,22 +283,12 @@ impl Settings {
     /// Load settings from disk
     pub fn load() -> Self {
         #[allow(unused_mut)]
-        let mut settings = if let Some(path) = Self::settings_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(s) = serde_json::from_str(&content) {
-                        s
-                    } else {
-                        Self::default()
-                    }
-                } else {
-                    Self::default()
-                }
-            } else {
-                Self::default()
-            }
-        } else {
-            Self::default()
+        let mut settings = match Self::settings_path() {
+            Some(path) if path.exists() => match std::fs::read_to_string(&path) {
+                Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+                Err(_) => Self::default(),
+            },
+            _ => Self::default(),
         };
 
         // Sync autostart toggle with actual registry state
@@ -506,14 +496,11 @@ impl ManualCookies {
 
     /// Load manual cookies from disk
     pub fn load() -> Self {
-        if let Some(path) = Self::cookies_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(cookies) = serde_json::from_str(&content) {
-                        return cookies;
-                    }
-                }
-            }
+        if let Some(path) = Self::cookies_path()
+            && path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            return serde_json::from_str(&content).unwrap_or_default();
         }
         Self::default()
     }
@@ -609,14 +596,11 @@ impl ApiKeys {
 
     /// Load API keys from disk
     pub fn load() -> Self {
-        if let Some(path) = Self::keys_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(keys) = serde_json::from_str(&content) {
-                        return keys;
-                    }
-                }
-            }
+        if let Some(path) = Self::keys_path()
+            && path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            return serde_json::from_str(&content).unwrap_or_default();
         }
         Self::default()
     }
@@ -917,8 +901,10 @@ mod tests {
         use tempfile::NamedTempFile;
 
         // Create settings with Chinese language
-        let mut settings = Settings::default();
-        settings.ui_language = Language::Chinese;
+        let settings = Settings {
+            ui_language: Language::Chinese,
+            ..Settings::default()
+        };
 
         // Save to a temp file
         let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
