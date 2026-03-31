@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.6] — 2026-03-31
+
+### Changed
+- Hardened the Windows release path by restoring the installer/portable asset flow and cleaning up repo-wide lint debt so the Rust quality gates stay green.
+
+### Fixed
+- Added a clear Windows Remote Desktop startup guard so the app shows a direct dialog instead of failing with opaque renderer errors.
+- Completed the Windows localization/auth recovery cleanup from the outstanding PR work and shipped the Claude parsing/update-path fixes in the merged codebase.
+
+---
+
 ## [1.2.5] — 2026-03-29
 
 ### Added
