@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.7] — 2026-03-31
+
+### Changed
+- Completed the Windows updater flow so update checks, background downloads, and quit-time install behavior use the same settings and release asset selection rules.
+
+### Fixed
+- Wired the existing `install_updates_on_quit` setting into the actual Windows quit path instead of leaving it as a dead preference.
+- Added visible General -> Updates controls for auto-download and quit-time install behavior in both English and Chinese.
+- Hardened pending installer detection so cached portable executables and stale/current-version installers are ignored, while the newest newer installer is preferred.
+- Fixed manual Check for Updates to respect the same auto-download behavior as startup checks and added a guard to prevent overlapping installer downloads.
+- Added coverage for pending-installer selection and beta-style installer names in the updater tests.
+
+---
+
 ## [1.2.6] — 2026-03-31
 
 ### Changed
