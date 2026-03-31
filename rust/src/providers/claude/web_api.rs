@@ -82,10 +82,16 @@ impl ClaudeWebApiFetcher {
         }
     }
 
-    /// Fetch usage using browser cookies
+    /// Fetch usage using browser cookies or env-var session key
     pub async fn fetch_with_cookies(&self) -> Result<ProviderFetchResult, ProviderError> {
+        // Check for explicit session key in environment first (most reliable)
+        if let Some(session_key) = Self::resolve_session_key_from_env() {
+            tracing::debug!("Using session key from environment variable");
+            let cookie_header = format!("sessionKey={}", session_key);
+            return self.fetch_with_cookie_header(&cookie_header).await;
+        }
+
         // Try multiple domains - Claude uses different domains for different services
-        // console.anthropic.com has the sessionKey for API access
         let domains = [
             "claude.ai",
             "claude.com",
@@ -118,18 +124,21 @@ impl ClaudeWebApiFetcher {
     ) -> Result<ProviderFetchResult, ProviderError> {
         tracing::debug!("Fetching Claude usage via web API");
 
+        // Build browser-mimicking headers shared across all requests
+        let headers = Self::build_headers(cookie_header);
+
         // Step 1: Get organization ID
-        let org_id = self.get_organization_id(cookie_header).await?;
+        let org_id = self.get_organization_id(&headers).await?;
         tracing::debug!("Got organization ID: {}", org_id);
 
-        // Step 2: Fetch usage data
-        let usage = self.get_usage(&org_id, cookie_header).await?;
+        // Fetch usage data
+        let usage = self.get_usage(&org_id, &headers).await?;
 
-        // Step 3: Fetch extra usage (credits) - optional
-        let extra_usage = self.get_extra_usage(&org_id, cookie_header).await.ok();
+        // Fetch extra usage (credits) - optional
+        let extra_usage = self.get_extra_usage(&org_id, &headers).await.ok();
 
-        // Step 4: Fetch account info - optional
-        let account = self.get_account_info(cookie_header).await.ok();
+        // Fetch account info - optional
+        let account = self.get_account_info(&headers).await.ok();
 
         // Build the result
         let primary = usage
@@ -193,15 +202,42 @@ impl ClaudeWebApiFetcher {
         Ok(result)
     }
 
-    /// Get the organization ID
-    async fn get_organization_id(&self, cookie_header: &str) -> Result<String, ProviderError> {
+    /// Build browser-mimicking headers for all claude.ai API requests.
+    /// claude.ai validates that requests look like they come from the web app.
+    fn build_headers(cookie_header: &str) -> reqwest::header::HeaderMap {
+        use reqwest::header::HeaderValue;
+        let mut map = reqwest::header::HeaderMap::new();
+        if let Ok(v) = HeaderValue::from_str(cookie_header) {
+            map.insert(header::COOKIE, v);
+        }
+        map.insert(header::ACCEPT, HeaderValue::from_static("application/json"));
+        map.insert(header::ORIGIN, HeaderValue::from_static("https://claude.ai"));
+        map.insert(header::REFERER, HeaderValue::from_static("https://claude.ai/settings/usage"));
+        map.insert(header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"));
+        map.insert(reqwest::header::HeaderName::from_static("anthropic-client-platform"), HeaderValue::from_static("web_claude_ai"));
+        map
+    }
+
+    /// Resolve a session key from `CLAUDE_AI_SESSION_KEY` or `CLAUDE_WEB_SESSION_KEY` env vars.
+    fn resolve_session_key_from_env() -> Option<String> {
+        let key = std::env::var("CLAUDE_AI_SESSION_KEY")
+            .or_else(|_| std::env::var("CLAUDE_WEB_SESSION_KEY"))
+            .ok()?;
+        let key = key.trim().to_string();
+        key.starts_with("sk-ant-").then_some(key)
+    }
+
+    /// Get the organization ID from the API
+    async fn get_organization_id(
+        &self,
+        headers: &reqwest::header::HeaderMap,
+    ) -> Result<String, ProviderError> {
         let url = format!("{}/organizations", Self::BASE_URL);
 
         let response = self
             .client
             .get(&url)
-            .header(header::COOKIE, cookie_header)
-            .header(header::ACCEPT, "application/json")
+            .headers(headers.clone())
             .send()
             .await?;
 
@@ -227,15 +263,14 @@ impl ClaudeWebApiFetcher {
     async fn get_usage(
         &self,
         org_id: &str,
-        cookie_header: &str,
+        headers: &reqwest::header::HeaderMap,
     ) -> Result<UsageResponse, ProviderError> {
         let url = format!("{}/organizations/{}/usage", Self::BASE_URL, org_id);
 
         let response = self
             .client
             .get(&url)
-            .header(header::COOKIE, cookie_header)
-            .header(header::ACCEPT, "application/json")
+            .headers(headers.clone())
             .send()
             .await?;
 
@@ -256,7 +291,7 @@ impl ClaudeWebApiFetcher {
     async fn get_extra_usage(
         &self,
         org_id: &str,
-        cookie_header: &str,
+        headers: &reqwest::header::HeaderMap,
     ) -> Result<ExtraUsageResponse, ProviderError> {
         let url = format!(
             "{}/organizations/{}/overage_spend_limit",
@@ -267,8 +302,7 @@ impl ClaudeWebApiFetcher {
         let response = self
             .client
             .get(&url)
-            .header(header::COOKIE, cookie_header)
-            .header(header::ACCEPT, "application/json")
+            .headers(headers.clone())
             .send()
             .await?;
 
@@ -288,15 +322,14 @@ impl ClaudeWebApiFetcher {
     /// Get account info
     async fn get_account_info(
         &self,
-        cookie_header: &str,
+        headers: &reqwest::header::HeaderMap,
     ) -> Result<AccountResponse, ProviderError> {
         let url = format!("{}/account", Self::BASE_URL);
 
         let response = self
             .client
             .get(&url)
-            .header(header::COOKIE, cookie_header)
-            .header(header::ACCEPT, "application/json")
+            .headers(headers.clone())
             .send()
             .await?;
 
