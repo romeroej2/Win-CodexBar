@@ -14,8 +14,6 @@ pub use version::{
 use async_trait::async_trait;
 use chrono::Datelike;
 use regex_lite::Regex;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;

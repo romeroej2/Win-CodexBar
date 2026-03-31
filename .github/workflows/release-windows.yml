@@ -1,0 +1,114 @@
+name: Release Windows App
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read app version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' rust/Cargo.toml | head -n 1)"
+          if [[ -z "$VERSION" ]]; then
+            echo "Failed to determine app version from rust/Cargo.toml" >&2
+            exit 1
+          fi
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build portable executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build \
+            --manifest-path rust/Cargo.toml \
+            --release \
+            --target x86_64-pc-windows-msvc \
+            --bin codexbar
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force rust\target\installer | Out-Null
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler not found at $iscc"
+          }
+
+          Push-Location rust\installer
+          try {
+            & $iscc `
+              /Qp `
+              "/DAppVersion=$env:APP_VERSION" `
+              "/DTargetBinDir=..\target\x86_64-pc-windows-msvc\release" `
+              "/DOutputDir=..\target\installer" `
+              "/DOutputBaseFilename=CodexBar-$env:APP_VERSION-Setup" `
+              codexbar.iss
+          } finally {
+            Pop-Location
+          }
+
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          $assetDir = "rust\target\release-assets"
+          New-Item -ItemType Directory -Force $assetDir | Out-Null
+
+          $portable = "rust\target\x86_64-pc-windows-msvc\release\codexbar.exe"
+          $installer = "rust\target\installer\CodexBar-$env:APP_VERSION-Setup.exe"
+
+          foreach ($path in @($portable, $installer)) {
+            if (-not (Test-Path $path)) {
+              throw "Missing expected asset: $path"
+            }
+            Copy-Item $path $assetDir -Force
+
+            $fileName = Split-Path $path -Leaf
+            $destPath = Join-Path $assetDir $fileName
+            $hash = (Get-FileHash -Algorithm SHA256 $destPath).Hash.ToLower()
+            "$hash  $fileName" | Set-Content -Encoding ascii "$destPath.sha256"
+          }
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" \
+            "rust/target/release-assets/CodexBar-$APP_VERSION-Setup.exe" \
+            "rust/target/release-assets/CodexBar-$APP_VERSION-Setup.exe.sha256" \
+            "rust/target/release-assets/codexbar.exe" \
+            "rust/target/release-assets/codexbar.exe.sha256" \
+            --clobber
+
+      - name: Upload workflow artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v6
+        with:
+          name: codexbar-windows-release-assets
+          path: |
+            rust/target/release-assets/CodexBar-${{ env.APP_VERSION }}-Setup.exe
+            rust/target/release-assets/CodexBar-${{ env.APP_VERSION }}-Setup.exe.sha256
+            rust/target/release-assets/codexbar.exe
+            rust/target/release-assets/codexbar.exe.sha256

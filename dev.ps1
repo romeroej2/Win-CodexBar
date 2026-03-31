@@ -35,6 +35,20 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = $PSScriptRoot
 $RustDir = Join-Path $RepoRoot "rust"
 
+function Get-RustHostTriple {
+    if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    $versionDetails = rustc -vV 2>$null
+    $hostLine = $versionDetails | Where-Object { $_ -like 'host:*' } | Select-Object -First 1
+    if (-not $hostLine) {
+        return $null
+    }
+
+    return ($hostLine -replace '^host:\s*', '').Trim()
+}
+
 # ── Ensure known tool paths are in current session PATH ─────────────────────
 
 $knownPaths = @("$env:USERPROFILE\.cargo\bin", "C:\mingw64\bin")
@@ -47,12 +61,14 @@ foreach ($p in $knownPaths) {
 # ── Check prerequisites ─────────────────────────────────────────────────────
 
 $hasCargo = [bool](Get-Command cargo -ErrorAction SilentlyContinue)
+$rustHostTriple = Get-RustHostTriple
+$needsDlltool = $rustHostTriple -like '*-windows-gnu'
 $hasDlltool = [bool](Get-Command dlltool -ErrorAction SilentlyContinue)
 
-if (-not $hasCargo -or -not $hasDlltool) {
+if (-not $hasCargo -or ($needsDlltool -and -not $hasDlltool)) {
     $missing = @()
     if (-not $hasCargo)   { $missing += "cargo (Rust)" }
-    if (-not $hasDlltool) { $missing += "dlltool (MinGW-w64)" }
+    if ($needsDlltool -and -not $hasDlltool) { $missing += "dlltool (MinGW-w64)" }
     Write-Host "Missing prerequisites: $($missing -join ', ')" -ForegroundColor Yellow
     Write-Host "Running setup script..." -ForegroundColor Cyan
     Write-Host ""
@@ -67,8 +83,10 @@ if (-not $hasCargo -or -not $hasDlltool) {
 
     # Re-check after setup
     $hasCargo = [bool](Get-Command cargo -ErrorAction SilentlyContinue)
+    $rustHostTriple = Get-RustHostTriple
+    $needsDlltool = $rustHostTriple -like '*-windows-gnu'
     $hasDlltool = [bool](Get-Command dlltool -ErrorAction SilentlyContinue)
-    if (-not $hasCargo -or -not $hasDlltool) {
+    if (-not $hasCargo -or ($needsDlltool -and -not $hasDlltool)) {
         Write-Host ""
         Write-Host "ERROR: Prerequisites still missing after setup." -ForegroundColor Red
         Write-Host "Please restart your terminal and try again." -ForegroundColor Yellow
@@ -99,10 +117,31 @@ if (-not $SkipBuild) {
 
 # Binary may be under target/<profile> or target/<triple>/<profile>
 $profile = if ($Release) { "release" } else { "debug" }
+$cargoConfigPath = Join-Path $RustDir ".cargo\config.toml"
+$configuredTarget = $null
+
+if ($env:CARGO_BUILD_TARGET) {
+    $configuredTarget = $env:CARGO_BUILD_TARGET
+} elseif (Test-Path $cargoConfigPath) {
+    $targetLine = Get-Content $cargoConfigPath | Where-Object { $_ -match '^\s*target\s*=\s*"([^"]+)"' } | Select-Object -First 1
+    if ($targetLine -and $targetLine -match '^\s*target\s*=\s*"([^"]+)"') {
+        $configuredTarget = $Matches[1]
+    }
+}
+
 $candidates = @(
-    (Join-Path $RustDir "target\$profile\codexbar.exe"),
-    (Join-Path $RustDir "target\x86_64-pc-windows-gnu\$profile\codexbar.exe")
+    (Join-Path $RustDir "target\$profile\codexbar.exe")
 )
+
+if ($configuredTarget) {
+    $candidates += Join-Path $RustDir "target\$configuredTarget\$profile\codexbar.exe"
+}
+
+$candidates += @(
+    (Join-Path $RustDir "target\x86_64-pc-windows-msvc\$profile\codexbar.exe"),
+    (Join-Path $RustDir "target\x86_64-pc-windows-gnu\$profile\codexbar.exe")
+) | Select-Object -Unique
+
 $binary = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 if (-not $binary) {

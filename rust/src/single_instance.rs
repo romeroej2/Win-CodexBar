@@ -21,6 +21,7 @@ pub struct SingleInstanceGuard {
 impl SingleInstanceGuard {
     /// Mutex name for CodexBar — uses Local namespace to restrict to current session,
     /// preventing other users/sessions from blocking startup.
+    #[cfg(windows)]
     const MUTEX_NAME: &'static str = "Local\\CodexBar_SingleInstance_Mutex";
 
     /// Try to acquire the single instance lock

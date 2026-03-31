@@ -60,6 +60,7 @@ impl MiniMaxLocalStorageImporter {
 
     /// Get paths to browser localStorage databases
     fn get_browser_paths() -> Vec<(String, PathBuf)> {
+        #[allow(unused_mut)]
         let mut paths = Vec::new();
 
         #[cfg(target_os = "windows")]
