@@ -22,6 +22,7 @@ use crate::core::{
 };
 use crate::core::{TokenAccountStore, TokenAccountSupport};
 use crate::cost_scanner::get_daily_cost_history;
+use crate::locale::Locale;
 use crate::login::LoginPhase;
 use crate::providers::*;
 use crate::settings::{ApiKeys, ManualCookies, Settings};
@@ -452,6 +453,7 @@ struct SharedState {
 pub struct CodexBarApp {
     state: Arc<Mutex<SharedState>>,
     settings: Settings,
+    locale: Locale,
     tray_manager: Option<UnifiedTrayManager>,
     tray_action_rx: Option<Receiver<TrayMenuAction>>,
     preferences_window: PreferencesWindow,
@@ -535,6 +537,7 @@ impl CodexBarApp {
         cc.egui_ctx.set_fonts(fonts);
 
         let settings = Settings::load();
+        let locale = Locale::load(settings.language);
         let enabled_ids = settings.get_enabled_provider_ids();
 
         let placeholders: Vec<ProviderData> = enabled_ids
@@ -562,7 +565,7 @@ impl CodexBarApp {
         }));
 
         // Initialize system tray based on settings
-        let tray_manager = match UnifiedTrayManager::new(&settings) {
+        let tray_manager = match UnifiedTrayManager::new(&settings, &locale) {
             Ok(tm) => Some(tm),
             Err(e) => {
                 tracing::warn!("Failed to create tray manager: {}", e);
@@ -711,6 +714,7 @@ impl CodexBarApp {
         Self {
             state,
             settings,
+            locale,
             tray_manager,
             tray_action_rx,
             preferences_window: PreferencesWindow::new(),
@@ -1869,12 +1873,23 @@ impl eframe::App for CodexBarApp {
         // Atomically consume settings changes so the flag is cleared in both
         // PreferencesWindow and the shared viewport state in one shot.
         if let Some(new_settings) = self.preferences_window.take_settings_if_changed() {
+            let language_changed = new_settings.language != self.settings.language;
             self.settings = new_settings;
             if let Err(e) = self.settings.save() {
                 tracing::error!("Failed to save settings: {}", e);
             }
             if previous_enabled_provider_ids != self.settings.get_enabled_provider_ids() {
                 refresh_requested = true;
+            }
+            if language_changed {
+                // Reload locale and rebuild tray with new language
+                self.locale = Locale::load(self.settings.language);
+                if let Some(ref mut tray) = self.tray_manager {
+                    match UnifiedTrayManager::new(&self.settings, &self.locale) {
+                        Ok(new_tray) => *tray = new_tray,
+                        Err(e) => tracing::warn!("Failed to rebuild tray after language change: {}", e),
+                    }
+                }
             }
         }
 

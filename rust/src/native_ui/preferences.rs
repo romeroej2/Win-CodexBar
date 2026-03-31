@@ -15,6 +15,7 @@ use crate::browser::cookies::get_cookie_header_from_browser;
 use crate::browser::detection::{BrowserDetector, BrowserType};
 use crate::core::{PersonalInfoRedactor, ProviderId, WidgetSnapshot, WidgetSnapshotStore};
 use crate::core::{ProviderAccountData, TokenAccount, TokenAccountStore, TokenAccountSupport};
+use crate::locale::Locale;
 use crate::settings::{get_api_key_providers, ApiKeys, ManualCookies, Settings, TrayIconMode};
 use crate::shortcuts::format_shortcut;
 use std::collections::HashMap;
@@ -38,15 +39,15 @@ pub enum PreferencesTab {
 }
 
 impl PreferencesTab {
-    fn label(&self) -> &'static str {
+    fn label<'a>(&self, locale: &'a Locale) -> &'a str {
         match self {
-            PreferencesTab::General => "通用",
-            PreferencesTab::Providers => "服务商",
-            PreferencesTab::Display => "显示",
-            PreferencesTab::ApiKeys => "API 密钥",
-            PreferencesTab::Cookies => "Cookies",
-            PreferencesTab::Advanced => "高级",
-            PreferencesTab::About => "关于",
+            PreferencesTab::General => locale.t("pref.tab.general"),
+            PreferencesTab::Providers => locale.t("pref.tab.providers"),
+            PreferencesTab::Display => locale.t("pref.tab.display"),
+            PreferencesTab::ApiKeys => locale.t("pref.tab.api_keys"),
+            PreferencesTab::Cookies => locale.t("pref.tab.cookies"),
+            PreferencesTab::Advanced => locale.t("pref.tab.advanced"),
+            PreferencesTab::About => locale.t("pref.tab.about"),
         }
     }
 
@@ -69,6 +70,7 @@ pub struct PreferencesWindow {
     pub active_tab: PreferencesTab,
     pub settings: Settings,
     pub settings_changed: bool,
+    locale: Locale,
     cookies: ManualCookies,
     new_cookie_provider: String,
     new_cookie_value: String,
@@ -126,6 +128,7 @@ struct PreferencesSharedState {
 impl Default for PreferencesWindow {
     fn default() -> Self {
         let settings = Settings::load();
+        let locale = Locale::load(settings.language);
         let cookies = ManualCookies::load();
         let api_keys = ApiKeys::load();
         let token_accounts = TokenAccountStore::new().load().unwrap_or_default();
@@ -163,6 +166,7 @@ impl Default for PreferencesWindow {
             active_tab: PreferencesTab::General,
             settings,
             settings_changed: false,
+            locale,
             cookies,
             new_cookie_provider: String::new(),
             new_cookie_value: String::new(),
@@ -2047,11 +2051,11 @@ fn work_area_rect(ctx: &egui::Context) -> Option<Rect> {
 
 /// Render the settings UI inside the viewport using shared state
 fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    // Get current tab from shared state
-    let active_tab = if let Ok(state) = shared_state.lock() {
-        state.active_tab
+    // Get current tab and language from shared state
+    let (active_tab, locale) = if let Ok(state) = shared_state.lock() {
+        (state.active_tab, Locale::load(state.settings.language))
     } else {
-        PreferencesTab::General
+        (PreferencesTab::General, Locale::load(crate::locale::Language::default()))
     };
 
     ui.vertical(|ui| {
@@ -2135,7 +2139,7 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             ui.painter().text(
                 egui::pos2(tab_rect.center().x, tab_rect.min.y + 44.0),
                 egui::Align2::CENTER_CENTER,
-                tab.label(),
+                tab.label(&locale),
                 egui::FontId::proportional(11.0),
                 label_color,
             );
@@ -2163,7 +2167,7 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         match active_tab {
             PreferencesTab::Providers => {
                 // Providers tab has special sidebar + detail layout
-                render_providers_tab_macos(ui, content_height, shared_state);
+                render_providers_tab_macos(ui, content_height, shared_state, &locale);
             }
             _ => {
                 egui::ScrollArea::vertical()
@@ -2172,12 +2176,12 @@ fn render_settings_ui(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         match active_tab {
-                            PreferencesTab::General => render_general_tab(ui, shared_state),
-                            PreferencesTab::Display => render_display_tab(ui, shared_state),
-                            PreferencesTab::ApiKeys => render_api_keys_tab(ui, shared_state),
-                            PreferencesTab::Cookies => render_cookies_tab(ui, shared_state),
-                            PreferencesTab::Advanced => render_advanced_tab(ui, shared_state),
-                            PreferencesTab::About => render_about_tab(ui),
+                            PreferencesTab::General => render_general_tab(ui, shared_state, &locale),
+                            PreferencesTab::Display => render_display_tab(ui, shared_state, &locale),
+                            PreferencesTab::ApiKeys => render_api_keys_tab(ui, shared_state, &locale),
+                            PreferencesTab::Cookies => render_cookies_tab(ui, shared_state, &locale),
+                            PreferencesTab::Advanced => render_advanced_tab(ui, shared_state, &locale),
+                            PreferencesTab::About => render_about_tab(ui, &locale),
                             PreferencesTab::Providers => unreachable!(),
                         }
                         ui.add_space(Spacing::LG);
@@ -2192,6 +2196,7 @@ fn render_providers_tab_macos(
     ui: &mut egui::Ui,
     available_height: f32,
     shared_state: &Arc<Mutex<PreferencesSharedState>>,
+    locale: &Locale,
 ) {
     // macOS metrics
     let sidebar_width = 240.0; // ProviderSettingsMetrics.sidebarWidth
@@ -3294,8 +3299,59 @@ fn render_accounts_section(
 }
 
 /// Render General tab for viewport
-fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    section_header(ui, "Startup");
+fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>, locale: &Locale) {
+    // LANGUAGE section - always first
+    section_header(ui, locale.t("pref.section.language"));
+
+    settings_card(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(
+                    RichText::new(locale.t("pref.language_label"))
+                        .size(FontSize::MD)
+                        .color(Theme::TEXT_PRIMARY),
+                );
+                ui.label(
+                    RichText::new(locale.t("pref.language_desc"))
+                        .size(FontSize::SM)
+                        .color(Theme::TEXT_MUTED),
+                );
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let current_lang = if let Ok(state) = shared_state.lock() {
+                    state.settings.language
+                } else {
+                    crate::locale::Language::default()
+                };
+
+                egui::Frame::none()
+                    .fill(Theme::BG_TERTIARY)
+                    .stroke(Stroke::new(1.0, Theme::BORDER_SUBTLE))
+                    .rounding(Rounding::same(Radius::SM))
+                    .inner_margin(egui::Margin::symmetric(Spacing::XS, 2.0))
+                    .show(ui, |ui| {
+                        let mut selected = current_lang;
+                        egui::ComboBox::from_id_salt("language_selector")
+                            .selected_text(selected.display_name())
+                            .show_ui(ui, |ui| {
+                                for lang in crate::locale::Language::all() {
+                                    if ui.selectable_value(&mut selected, *lang, lang.display_name()).changed() {
+                                        if let Ok(mut state) = shared_state.lock() {
+                                            state.settings.language = selected;
+                                            state.settings_changed = true;
+                                        }
+                                    }
+                                }
+                            });
+                    });
+            });
+        });
+    });
+
+    ui.add_space(Spacing::LG);
+
+    section_header(ui, locale.t("pref.section.startup"));
 
     settings_card(ui, |ui| {
         let mut start_at_login = if let Ok(state) = shared_state.lock() {
@@ -3306,8 +3362,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "开机启动",
-            "登录后自动启动 CodexBar",
+            locale.t("pref.start_at_login"),
+            locale.t("pref.start_at_login_desc"),
             &mut start_at_login,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3329,8 +3385,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "最小化启动",
-            "启动后停留在系统托盘",
+            locale.t("pref.start_minimized"),
+            locale.t("pref.start_minimized_desc"),
             &mut start_minimized,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3342,7 +3398,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
     ui.add_space(Spacing::LG);
 
-    section_header(ui, "Notifications");
+    section_header(ui, locale.t("pref.section.notifications"));
 
     settings_card(ui, |ui| {
         let mut show_notifications = if let Ok(state) = shared_state.lock() {
@@ -3353,8 +3409,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "显示通知",
-            "达到用量阈值时提醒",
+            locale.t("pref.show_notif"),
+            locale.t("pref.show_notif_desc"),
             &mut show_notifications,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3374,8 +3430,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "声音提示",
-            "达到阈值时播放提示音",
+            locale.t("pref.sound"),
+            locale.t("pref.sound_desc"),
             &mut sound_enabled,
         ) {
             if let Ok(mut state) = shared_state.lock() {
@@ -3398,7 +3454,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                 // Title row with volume badge on right
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("提示音音量")
+                        RichText::new(locale.t("pref.volume"))
                             .size(FontSize::MD)
                             .color(Theme::TEXT_PRIMARY),
                     );
@@ -3420,7 +3476,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
                 ui.add_space(2.0);
                 ui.label(
-                    RichText::new("告警提示音音量")
+                    RichText::new(locale.t("pref.alert_volume"))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -3456,7 +3512,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("高位预警")
+                    RichText::new(locale.t("pref.high_warning"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3478,7 +3534,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("在该用量水平显示预警")
+                RichText::new(locale.t("pref.high_warning_desc"))
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -3515,7 +3571,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
             // Title row with percentage badge on right
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("严重告警")
+                    RichText::new(locale.t("pref.critical_alert"))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -3537,7 +3593,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
             ui.add_space(2.0);
             ui.label(
-                RichText::new("在该水平显示严重告警")
+                RichText::new(locale.t("pref.critical_alert_desc"))
                     .size(FontSize::SM)
                     .color(Theme::TEXT_MUTED),
             );
@@ -3740,8 +3796,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 }
 
 /// Render Display tab for viewport
-fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    section_header(ui, "Appearance");
+fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>, locale: &Locale) {
+    section_header(ui, locale.t("pref.section.appearance"));
 
     settings_card(ui, |ui| {
         let mut relative_time = if let Ok(state) = shared_state.lock() {
@@ -3785,8 +3841,8 @@ fn render_display_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 }
 
 /// Render API Keys tab for viewport
-fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    section_header(ui, "API Keys");
+fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>, locale: &Locale) {
+    section_header(ui, locale.t("pref.section.api_keys"));
 
     ui.label(
         RichText::new("为需要认证的服务商配置访问令牌。")
@@ -4108,8 +4164,8 @@ fn render_api_keys_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
 }
 
 /// Render Cookies tab for viewport
-fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    section_header(ui, "Browser Cookies");
+fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>, locale: &Locale) {
+    section_header(ui, locale.t("pref.section.browser_cookies"));
 
     ui.label(
         RichText::new("Cookies 会自动从 Chrome、Edge、Brave 和 Firefox 中提取。")
@@ -4330,8 +4386,8 @@ fn render_cookies_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 }
 
 /// Render Advanced tab for viewport
-fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>) {
-    section_header(ui, "Refresh");
+fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSharedState>>, locale: &Locale) {
+    section_header(ui, locale.t("pref.section.refresh"));
 
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
@@ -4393,7 +4449,7 @@ fn render_advanced_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSh
 }
 
 /// Render About tab for viewport
-fn render_about_tab(ui: &mut egui::Ui) {
+fn render_about_tab(ui: &mut egui::Ui, locale: &Locale) {
     ui.vertical_centered(|ui| {
         ui.add_space(Spacing::XL);
 

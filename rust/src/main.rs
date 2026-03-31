@@ -13,6 +13,7 @@ mod cli;
 mod core;
 mod cost_scanner;
 mod host;
+mod locale;
 mod logging;
 mod login;
 mod native_ui;

@@ -15,6 +15,7 @@ use tray_icon::{
 
 use super::icon::{LoadingPattern, UsageLevel};
 use crate::core::ProviderId;
+use crate::locale::Locale;
 use crate::settings::{Settings, TrayIconMode};
 use crate::status::IndicatorStatusLevel;
 
@@ -102,19 +103,18 @@ pub struct TrayManager {
 
 impl TrayManager {
     /// Create a new tray manager with default icon
-    pub fn new() -> anyhow::Result<Self> {
-        let settings = Settings::load();
+    pub fn new(settings: &Settings, locale: &Locale) -> anyhow::Result<Self> {
         let menu = Menu::new();
 
         // Open CodexBar
-        let open_item = MenuItem::with_id("open", "打开 CodexBar", true, None);
+        let open_item = MenuItem::with_id("open", locale.t("tray.open"), true, None);
         menu.append(&open_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Refresh All
-        let refresh_item = MenuItem::with_id("refresh", "全部刷新", true, None);
+        let refresh_item = MenuItem::with_id("refresh", locale.t("tray.refresh"), true, None);
         menu.append(&refresh_item)?;
 
         // Separator
@@ -122,7 +122,7 @@ impl TrayManager {
 
         // Providers submenu with check items
         // Build submenu items first, then add to parent menu to avoid Windows duplication bug
-        let providers_submenu = Submenu::new("服务商", true);
+        let providers_submenu = Submenu::new(locale.t("tray.providers"), true);
         let mut provider_menu_items = HashMap::new();
         for provider_id in ProviderId::all() {
             let cli_name = provider_id.cli_name();
@@ -139,25 +139,25 @@ impl TrayManager {
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Settings
-        let settings_item = MenuItem::with_id("settings", "设置...", true, None);
+        let settings_item = MenuItem::with_id("settings", locale.t("tray.settings"), true, None);
         menu.append(&settings_item)?;
 
         // Check for Updates
-        let updates_item = MenuItem::with_id("updates", "检查更新", true, None);
+        let updates_item = MenuItem::with_id("updates", locale.t("tray.updates"), true, None);
         menu.append(&updates_item)?;
 
         // Separator
         menu.append(&PredefinedMenuItem::separator())?;
 
         // Quit
-        let quit_item = MenuItem::with_id("quit", "退出", true, None);
+        let quit_item = MenuItem::with_id("quit", locale.t("tray.quit"), true, None);
         menu.append(&quit_item)?;
 
         let icon = create_bar_icon(0.0, 0.0, IconOverlay::None);
 
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("CodexBar - 加载中...")
+            .with_tooltip(locale.t("tray.loading"))
             .with_icon(icon)
             .build()?;
 
@@ -667,9 +667,9 @@ pub enum UnifiedTrayManager {
 
 impl UnifiedTrayManager {
     /// Create a new unified tray manager based on settings
-    pub fn new(settings: &Settings) -> anyhow::Result<Self> {
+    pub fn new(settings: &Settings, locale: &Locale) -> anyhow::Result<Self> {
         match settings.tray_icon_mode {
-            TrayIconMode::Single => Ok(UnifiedTrayManager::Single(TrayManager::new()?)),
+            TrayIconMode::Single => Ok(UnifiedTrayManager::Single(TrayManager::new(settings, locale)?)),
             TrayIconMode::PerProvider => {
                 let mut multi = MultiTrayManager::new()?;
                 let enabled = settings.get_enabled_provider_ids();

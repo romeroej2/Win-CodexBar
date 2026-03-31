@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::core::ProviderId;
+use crate::locale::Language;
 
 /// Update channel for receiving updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -198,6 +199,10 @@ pub struct Settings {
     /// Install pending updates when quitting the application
     #[serde(default)]
     pub install_updates_on_quit: bool,
+
+    /// UI language preference
+    #[serde(default)]
+    pub language: Language,
 }
 
 fn default_true() -> bool {
@@ -239,6 +244,7 @@ impl Default for Settings {
             global_shortcut: default_global_shortcut(), // Ctrl+Shift+U by default
             auto_download_updates: true, // Auto-download updates by default
             install_updates_on_quit: false, // Don't auto-install on quit by default
+            language: Language::default(), // Chinese by default
         }
     }
 }
