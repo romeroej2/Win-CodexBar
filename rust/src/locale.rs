@@ -84,6 +84,7 @@ pub fn tray_tooltip_credits(provider_name: &str, credits_percent: f64) -> String
 }
 
 /// Locale keys for app-owned UI strings
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum LocaleKey {
     // Tab names (Preferences)
@@ -348,6 +349,11 @@ pub enum LocaleKey {
     MenuBarMetricHelper,
     UsageSource,
     AutoFallbackHelp,
+    ProviderSourceOauthWeb,
+    Automatic,
+    Average,
+    OAuth,
+    Api,
 
     // General tab sections
     PrivacyTitle,
@@ -367,6 +373,9 @@ pub enum LocaleKey {
     // Cookies tab
     BrowserCookiesTitle,
     CookieImport,
+    Provider,
+    SelectPlaceholder,
+    AutoRefreshInterval,
 
     // About tab - render_about_tab
     AboutDescription,
@@ -374,6 +383,26 @@ pub enum LocaleKey {
     ViewOnGitHub,
     SubmitIssue,
     MaintainedBy,
+    CommitLabel,
+    BuildDateLabel,
+
+    // Shared form controls
+    Save,
+    Cancel,
+    Label,
+    Token,
+    AddAccount,
+    AccountAdded,
+    AccountRemoved,
+    AccountSwitched,
+    AccountLabelHint,
+    EnterApiKeyFor,
+    PasteApiKeyHere,
+    ApiKeySaved,
+    ApiKeyRemoved,
+    EnvironmentVariable,
+    CookieSavedForProvider,
+    CookieRemovedForProvider,
 
     // Usage helper functions
     ShowUsedPercent,
@@ -496,7 +525,6 @@ impl LocaleKey {
             LocaleKey::UpdateChannelBeta => "Beta",
             LocaleKey::Never => "Never",
             LocaleKey::LastUpdated => "Updated",
-            LocaleKey::NeverUpdated => "Never updated",
             LocaleKey::MinutesAgo => "{} minutes ago",
             LocaleKey::HoursAgo => "{} hours ago",
             LocaleKey::DaysAgo => "{} days ago",
@@ -659,28 +687,46 @@ impl LocaleKey {
             // Provider detail - Settings section
             LocaleKey::ProviderSettingsTitle => "Settings",
             LocaleKey::MenuBarMetric => "Menu Bar Metric",
-            LocaleKey::MenuBarMetricHelper => "Choose which time window drives the menu bar percentage",
+            LocaleKey::MenuBarMetricHelper => {
+                "Choose which time window drives the menu bar percentage"
+            }
             LocaleKey::UsageSource => "Usage Source",
-            LocaleKey::AutoFallbackHelp => "Auto falls back to the next source if the preferred one fails.",
+            LocaleKey::AutoFallbackHelp => {
+                "Auto falls back to the next source if the preferred one fails."
+            }
+            LocaleKey::ProviderSourceOauthWeb => "OAuth + Web",
+            LocaleKey::Automatic => "Automatic",
+            LocaleKey::Average => "Average",
+            LocaleKey::OAuth => "OAuth",
+            LocaleKey::Api => "API",
 
             // General tab sections
             LocaleKey::PrivacyTitle => "Privacy",
             LocaleKey::HidePersonalInfo => "Hide Personal Info",
-            LocaleKey::HidePersonalInfoHelper => "Mask emails and account names (good for streaming)",
+            LocaleKey::HidePersonalInfoHelper => {
+                "Mask emails and account names (good for streaming)"
+            }
             LocaleKey::UpdatesTitle => "Updates",
             LocaleKey::UpdateChannelChoice => "Update Channel",
-            LocaleKey::UpdateChannelChoiceHelper => "Choose between stable and beta preview versions",
+            LocaleKey::UpdateChannelChoiceHelper => {
+                "Choose between stable and beta preview versions"
+            }
 
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "Keyboard Shortcuts",
             LocaleKey::GlobalShortcutLabel => "Global Shortcut",
-            LocaleKey::ShortcutFormatHint => "Format: Ctrl+Shift+Key, Alt+Ctrl+Key, etc. Restart required to apply changes.",
+            LocaleKey::ShortcutFormatHint => {
+                "Format: Ctrl+Shift+Key, Alt+Ctrl+Key, etc. Restart required to apply changes."
+            }
             LocaleKey::Saved => "Saved (restart to apply)",
             LocaleKey::InvalidFormat => "Invalid shortcut format",
 
             // Cookies tab
             LocaleKey::BrowserCookiesTitle => "Browser Cookies",
             LocaleKey::CookieImport => "Cookie Import",
+            LocaleKey::Provider => "Provider",
+            LocaleKey::SelectPlaceholder => "Select...",
+            LocaleKey::AutoRefreshInterval => "Auto-refresh interval",
 
             // About tab
             LocaleKey::AboutDescription => "A Windows port of the original macOS version.",
@@ -688,6 +734,26 @@ impl LocaleKey {
             LocaleKey::ViewOnGitHub => "→ View on GitHub",
             LocaleKey::SubmitIssue => "→ Submit an Issue",
             LocaleKey::MaintainedBy => "Maintained by CodexBar contributors",
+            LocaleKey::CommitLabel => "Commit",
+            LocaleKey::BuildDateLabel => "Built",
+
+            // Shared form controls
+            LocaleKey::Save => "Save",
+            LocaleKey::Cancel => "Cancel",
+            LocaleKey::Label => "Label",
+            LocaleKey::Token => "Token",
+            LocaleKey::AddAccount => "Add Account",
+            LocaleKey::AccountAdded => "Account added",
+            LocaleKey::AccountRemoved => "Account removed",
+            LocaleKey::AccountSwitched => "Account switched",
+            LocaleKey::AccountLabelHint => "e.g., Work Account, Personal...",
+            LocaleKey::EnterApiKeyFor => "Enter API key for {}",
+            LocaleKey::PasteApiKeyHere => "Paste your API key here...",
+            LocaleKey::ApiKeySaved => "Saved API key for {}",
+            LocaleKey::ApiKeyRemoved => "Removed API key for {}",
+            LocaleKey::EnvironmentVariable => "Environment variable",
+            LocaleKey::CookieSavedForProvider => "Saved cookies for {}",
+            LocaleKey::CookieRemovedForProvider => "Removed cookies for {}",
 
             // Usage helper functions
             LocaleKey::ShowUsedPercent => "{:.0}% used",
@@ -800,7 +866,6 @@ impl LocaleKey {
             LocaleKey::UpdateChannelBeta => "测试预览版",
             LocaleKey::Never => "从不",
             LocaleKey::LastUpdated => "上次更新",
-            LocaleKey::NeverUpdated => "从未更新",
             LocaleKey::MinutesAgo => "{} 分钟前更新",
             LocaleKey::HoursAgo => "{} 小时前更新",
             LocaleKey::DaysAgo => "{} 天前更新",
@@ -966,6 +1031,11 @@ impl LocaleKey {
             LocaleKey::MenuBarMetricHelper => "选择由哪个时间窗口驱动菜单栏百分比",
             LocaleKey::UsageSource => "用量来源",
             LocaleKey::AutoFallbackHelp => "当首选来源失败时自动回退到下一个来源。",
+            LocaleKey::ProviderSourceOauthWeb => "OAuth + 网页",
+            LocaleKey::Automatic => "自动",
+            LocaleKey::Average => "平均",
+            LocaleKey::OAuth => "OAuth",
+            LocaleKey::Api => "API",
 
             // General tab sections
             LocaleKey::PrivacyTitle => "隐私",
@@ -978,13 +1048,18 @@ impl LocaleKey {
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "快捷键",
             LocaleKey::GlobalShortcutLabel => "全局快捷键",
-            LocaleKey::ShortcutFormatHint => "格式：Ctrl+Shift+Key、Alt+Ctrl+Key 等。需重启以应用更改。",
+            LocaleKey::ShortcutFormatHint => {
+                "格式：Ctrl+Shift+Key、Alt+Ctrl+Key 等。需重启以应用更改。"
+            }
             LocaleKey::Saved => "已保存（需重启以应用）",
             LocaleKey::InvalidFormat => "无效的快捷键格式",
 
             // Cookies tab
             LocaleKey::BrowserCookiesTitle => "浏览器 Cookie",
             LocaleKey::CookieImport => "Cookie 导入",
+            LocaleKey::Provider => "服务商",
+            LocaleKey::SelectPlaceholder => "请选择...",
+            LocaleKey::AutoRefreshInterval => "自动刷新间隔",
 
             // About tab
             LocaleKey::AboutDescription => "CodexBar 的 Windows 移植版本。",
@@ -992,6 +1067,26 @@ impl LocaleKey {
             LocaleKey::ViewOnGitHub => "→ 查看 GitHub",
             LocaleKey::SubmitIssue => "→ 提交问题",
             LocaleKey::MaintainedBy => "由 CodexBar 贡献者维护",
+            LocaleKey::CommitLabel => "提交",
+            LocaleKey::BuildDateLabel => "构建",
+
+            // Shared form controls
+            LocaleKey::Save => "保存",
+            LocaleKey::Cancel => "取消",
+            LocaleKey::Label => "标签",
+            LocaleKey::Token => "令牌",
+            LocaleKey::AddAccount => "添加账号",
+            LocaleKey::AccountAdded => "账号已添加",
+            LocaleKey::AccountRemoved => "账号已移除",
+            LocaleKey::AccountSwitched => "账号已切换",
+            LocaleKey::AccountLabelHint => "例如：工作账号、个人账号...",
+            LocaleKey::EnterApiKeyFor => "为 {} 输入 API Key",
+            LocaleKey::PasteApiKeyHere => "在这里粘贴 API key...",
+            LocaleKey::ApiKeySaved => "已保存 {} 的 API key",
+            LocaleKey::ApiKeyRemoved => "已移除 {} 的 API key",
+            LocaleKey::EnvironmentVariable => "环境变量",
+            LocaleKey::CookieSavedForProvider => "已保存 {} 的 Cookie",
+            LocaleKey::CookieRemovedForProvider => "已移除 {} 的 Cookie",
 
             // Usage helper functions
             LocaleKey::ShowUsedPercent => "已使用 {:.0}%",

@@ -121,9 +121,7 @@ pub enum TrayTooltipState {
     /// No providers available
     NoProviders,
     /// Merged providers display
-    Merged {
-        providers: Vec<ProviderUsage>,
-    },
+    Merged { providers: Vec<ProviderUsage> },
     /// Error state
     Error {
         provider_name: String,
@@ -609,11 +607,20 @@ impl TrayManager {
     fn relocalize_tooltip(&self, lang: crate::settings::Language) -> String {
         let state = self.tooltip_state.borrow();
         match &*state {
-            TrayTooltipState::Default => locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string(),
-            TrayTooltipState::Normal { provider_name, session_percent, weekly_percent } => {
-                locale::tray_tooltip(provider_name, *session_percent, *weekly_percent)
+            TrayTooltipState::Default => {
+                locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string()
             }
-            TrayTooltipState::WithStatus { provider_name, session_percent, weekly_percent, overlay } => {
+            TrayTooltipState::Normal {
+                provider_name,
+                session_percent,
+                weekly_percent,
+            } => locale::tray_tooltip(provider_name, *session_percent, *weekly_percent),
+            TrayTooltipState::WithStatus {
+                provider_name,
+                session_percent,
+                weekly_percent,
+                overlay,
+            } => {
                 let status = match overlay {
                     IconOverlay::None => None,
                     IconOverlay::Error => Some(IconOverlayStatus::Error),
@@ -621,13 +628,23 @@ impl TrayManager {
                     IconOverlay::Incident => Some(IconOverlayStatus::Incident),
                     IconOverlay::Partial => Some(IconOverlayStatus::Partial),
                 };
-                locale::tray_tooltip_with_status(provider_name, *session_percent, *weekly_percent, status)
+                locale::tray_tooltip_with_status(
+                    provider_name,
+                    *session_percent,
+                    *weekly_percent,
+                    status,
+                )
             }
-            TrayTooltipState::Credits { provider_name, credits_percent } => {
-                locale::tray_tooltip_credits(provider_name, *credits_percent)
+            TrayTooltipState::Credits {
+                provider_name,
+                credits_percent,
+            } => locale::tray_tooltip_credits(provider_name, *credits_percent),
+            TrayTooltipState::Loading => {
+                locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string()
             }
-            TrayTooltipState::Loading => locale::get_text(lang, locale::LocaleKey::TrayLoading).to_string(),
-            TrayTooltipState::NoProviders => locale::get_text(lang, locale::LocaleKey::TrayNoProviders).to_string(),
+            TrayTooltipState::NoProviders => {
+                locale::get_text(lang, locale::LocaleKey::TrayNoProviders).to_string()
+            }
             TrayTooltipState::Merged { providers } => {
                 let tooltip_lines: Vec<String> = providers
                     .iter()
@@ -636,7 +653,10 @@ impl TrayManager {
                     .collect();
                 format!("CodexBar\n{}", tooltip_lines.join("\n"))
             }
-            TrayTooltipState::Error { provider_name, error_msg } => {
+            TrayTooltipState::Error {
+                provider_name,
+                error_msg,
+            } => {
                 format!("{}: {}", provider_name, error_msg)
             }
         }
@@ -721,9 +741,7 @@ pub enum ProviderTooltipState {
     /// Loading state
     Loading,
     /// Error state
-    Error {
-        error_msg: String,
-    },
+    Error { error_msg: String },
 }
 
 /// Multi-provider tray manager for per-provider icon mode
@@ -1075,7 +1093,11 @@ impl MultiTrayManager {
             Some(ProviderTooltipState::Normal {
                 session_percent,
                 weekly_percent,
-            }) => locale::tray_tooltip(provider_id.display_name(), *session_percent, *weekly_percent),
+            }) => locale::tray_tooltip(
+                provider_id.display_name(),
+                *session_percent,
+                *weekly_percent,
+            ),
             Some(ProviderTooltipState::WithStatus {
                 session_percent,
                 weekly_percent,
@@ -1999,9 +2021,13 @@ mod tests {
             session_percent: 50.0,
             weekly_percent: 25.0,
         };
-        
+
         match &state {
-            TrayTooltipState::Normal { provider_name, session_percent, weekly_percent } => {
+            TrayTooltipState::Normal {
+                provider_name,
+                session_percent,
+                weekly_percent,
+            } => {
                 assert_eq!(provider_name, "Claude");
                 assert_eq!(*session_percent, 50.0);
                 assert_eq!(*weekly_percent, 25.0);
@@ -2018,9 +2044,14 @@ mod tests {
             weekly_percent: 30.0,
             overlay: IconOverlay::Error,
         };
-        
+
         match &state {
-            TrayTooltipState::WithStatus { provider_name, session_percent, weekly_percent, overlay } => {
+            TrayTooltipState::WithStatus {
+                provider_name,
+                session_percent,
+                weekly_percent,
+                overlay,
+            } => {
                 assert_eq!(provider_name, "Codex");
                 assert_eq!(*session_percent, 75.0);
                 assert_eq!(*weekly_percent, 30.0);
@@ -2036,9 +2067,12 @@ mod tests {
             provider_name: "OpenAI".to_string(),
             credits_percent: 80.0,
         };
-        
+
         match &state {
-            TrayTooltipState::Credits { provider_name, credits_percent } => {
+            TrayTooltipState::Credits {
+                provider_name,
+                credits_percent,
+            } => {
                 assert_eq!(provider_name, "OpenAI");
                 assert_eq!(*credits_percent, 80.0);
             }
@@ -2052,9 +2086,12 @@ mod tests {
             provider_name: "Claude".to_string(),
             error_msg: "Connection failed".to_string(),
         };
-        
+
         match &state {
-            TrayTooltipState::Error { provider_name, error_msg } => {
+            TrayTooltipState::Error {
+                provider_name,
+                error_msg,
+            } => {
                 assert_eq!(provider_name, "Claude");
                 assert_eq!(error_msg, "Connection failed");
             }
@@ -2074,9 +2111,12 @@ mod tests {
             session_percent: 60.0,
             weekly_percent: 40.0,
         };
-        
+
         match &state {
-            ProviderTooltipState::Normal { session_percent, weekly_percent } => {
+            ProviderTooltipState::Normal {
+                session_percent,
+                weekly_percent,
+            } => {
                 assert_eq!(*session_percent, 60.0);
                 assert_eq!(*weekly_percent, 40.0);
             }
@@ -2091,9 +2131,13 @@ mod tests {
             weekly_percent: 35.0,
             overlay: IconOverlay::Incident,
         };
-        
+
         match &state {
-            ProviderTooltipState::WithStatus { session_percent, weekly_percent, overlay } => {
+            ProviderTooltipState::WithStatus {
+                session_percent,
+                weekly_percent,
+                overlay,
+            } => {
                 assert_eq!(*session_percent, 70.0);
                 assert_eq!(*weekly_percent, 35.0);
                 assert_eq!(*overlay, IconOverlay::Incident);
@@ -2107,7 +2151,7 @@ mod tests {
         let state = ProviderTooltipState::Error {
             error_msg: "Auth failed".to_string(),
         };
-        
+
         match &state {
             ProviderTooltipState::Error { error_msg } => {
                 assert_eq!(error_msg, "Auth failed");
@@ -2136,11 +2180,11 @@ mod tests {
                 weekly_percent: 40.0,
             },
         ];
-        
+
         let state = TrayTooltipState::Merged {
             providers: providers.clone(),
         };
-        
+
         match &state {
             TrayTooltipState::Merged { providers: p } => {
                 assert_eq!(p.len(), 2);

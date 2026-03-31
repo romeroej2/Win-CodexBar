@@ -282,6 +282,7 @@ impl Settings {
 
     /// Load settings from disk
     pub fn load() -> Self {
+        #[allow(unused_mut)]
         let mut settings = if let Some(path) = Self::settings_path() {
             if path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&path) {
@@ -922,12 +923,15 @@ mod tests {
         // Save to a temp file
         let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
         let json = serde_json::to_string_pretty(&settings).expect("Failed to serialize settings");
-        temp_file.write_all(json.as_bytes()).expect("Failed to write settings");
+        temp_file
+            .write_all(json.as_bytes())
+            .expect("Failed to write settings");
         let path = temp_file.path().to_path_buf();
 
         // Read back and verify
         let content = std::fs::read_to_string(&path).expect("Failed to read settings");
-        let loaded: Settings = serde_json::from_str(&content).expect("Failed to deserialize settings");
+        let loaded: Settings =
+            serde_json::from_str(&content).expect("Failed to deserialize settings");
 
         assert_eq!(loaded.ui_language, Language::Chinese);
     }

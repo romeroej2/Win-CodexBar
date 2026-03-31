@@ -97,6 +97,9 @@ When running inside WSL, CodexBar:
 
 Download the latest release from [GitHub Releases](https://github.com/Finesssee/Win-CodexBar/releases).
 
+- Recommended installer: `CodexBar-<version>-Setup.exe`
+- Portable build: `codexbar.exe`
+
 ### Manual Build
 
 Prerequisites: Rust 1.70+ with `x86_64-pc-windows-gnu` target, MinGW-w64.
@@ -156,8 +159,10 @@ codexbar cost -p claude
 
 1. Run `codexbar menubar` to start the app
 2. Click **Settings** in the menu
-3. Go to **Providers** tab and enable the providers you use
-4. Make sure you're logged into the provider CLIs (e.g., `codex`, `claude`, `gemini`)
+3. In **General**, choose your preferred UI language
+4. In **Providers**, enable the providers you use and check their auth state
+5. If a provider stops updating, recover credentials from **Cookies**, **API Keys**, or the provider account section
+6. Make sure you're logged into the provider CLIs you use (for example `codex`, `claude`, or `gemini`)
 
 ## Browser Cookie Extraction
 
@@ -188,7 +193,7 @@ If automatic extraction fails, you can add cookies manually:
 | System Tray | NSStatusItem | tray-icon crate | tray-icon (WSLg) |
 | Cookie Decryption | Keychain | DPAPI | Manual cookies |
 | Widget | WidgetKit | Not available | Not available |
-| Auto-update | Sparkle | Manual | Manual |
+| Auto-update | Sparkle | Installer-first, manual fallback | Manual reinstall |
 | Notifications | macOS native | PowerShell toast | notify-send |
 
 ## Privacy

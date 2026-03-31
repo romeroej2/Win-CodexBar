@@ -32,6 +32,9 @@ A Windows port of [CodexBar](https://github.com/steipete/CodexBar) - a system tr
 
 Download the latest release from the [Releases](https://github.com/Finesssee/Win-CodexBar/releases) page.
 
+- Recommended: `CodexBar-<version>-Setup.exe`
+- Portable: `codexbar.exe`
+
 ### Build from Source
 
 Requirements:
@@ -63,8 +66,9 @@ codexbar menubar
 
 This launches the system tray application:
 - Click the tray icon to show the usage panel
-- Use the Settings button to configure providers and refresh intervals
-- Use the Cookies button for manual cookie input if needed
+- Use Settings to pick English or Chinese in `General`
+- Use the Providers tab to re-enable providers and review auth/account state
+- Use the Cookies, API Keys, or provider account sections to recover credentials if status stops updating
 - Use the About button for version info
 
 ### CLI Mode

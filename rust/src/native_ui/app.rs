@@ -262,7 +262,11 @@ impl ProviderData {
     }
 }
 
-fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool, lang: Language) -> String {
+fn format_reset_time(
+    reset: chrono::DateTime<chrono::Utc>,
+    relative: bool,
+    lang: Language,
+) -> String {
     if relative {
         let now = chrono::Utc::now();
         let diff = reset - now;
@@ -293,7 +297,10 @@ fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool, lang:
             local_time.format("%I:%M %p").to_string()
         } else if reset_date == today + chrono::Days::new(1) {
             let tomorrow_template = locale_text(lang, LocaleKey::TomorrowAt);
-            format!("{}", tomorrow_template.replace("{}", &local_time.format("%I:%M %p").to_string()))
+            format!(
+                "{}",
+                tomorrow_template.replace("{}", &local_time.format("%I:%M %p").to_string())
+            )
         } else {
             local_time.format("%b %d, %I:%M %p").to_string()
         }
@@ -342,9 +349,11 @@ fn usage_display_percent(used_percent: f64, show_as_used: bool) -> f64 {
 
 fn usage_display_label(display_percent: f64, show_as_used: bool, lang: Language) -> String {
     if show_as_used {
-        locale_text(lang, LocaleKey::UsedPercent).replace("{:.0}", &format!("{:.0}", display_percent))
+        locale_text(lang, LocaleKey::UsedPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     } else {
-        locale_text(lang, LocaleKey::RemainingPercent).replace("{:.0}", &format!("{:.0}", display_percent))
+        locale_text(lang, LocaleKey::RemainingPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     }
 }
 
@@ -450,6 +459,44 @@ struct SharedState {
     login_provider: Option<String>,
     login_phase: LoginPhase,
     login_message: Option<String>,
+}
+
+fn open_update_destination(update: &UpdateInfo) {
+    let _ = open::that(&update.download_url);
+}
+
+fn start_update_download(state: Arc<Mutex<SharedState>>, update: UpdateInfo) {
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("Failed to create runtime for update download: {}", e);
+                if let Ok(mut s) = state.lock() {
+                    s.update_state = UpdateState::Failed(e.to_string());
+                }
+                return;
+            }
+        };
+
+        rt.block_on(async move {
+            if let Ok(mut s) = state.lock() {
+                s.update_state = UpdateState::Downloading(0.0);
+            }
+            let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
+            match updater::download_update(&update, progress_tx).await {
+                Ok(path) => {
+                    if let Ok(mut s) = state.lock() {
+                        s.update_state = UpdateState::Ready(path);
+                    }
+                }
+                Err(e) => {
+                    if let Ok(mut s) = state.lock() {
+                        s.update_state = UpdateState::Failed(e);
+                    }
+                }
+            }
+        });
+    });
 }
 
 pub struct CodexBarApp {
@@ -626,7 +673,7 @@ impl CodexBarApp {
                                 s.update_available = Some(update.clone());
                                 s.update_checked = true;
                                 s.update_state = UpdateState::Available;
-                                auto_download
+                                auto_download && update.supports_auto_download()
                             } else {
                                 false
                             }
@@ -1498,94 +1545,84 @@ impl eframe::App for CodexBarApp {
                                             // Action button based on state
                                             match &update_download_state {
                                                 UpdateState::Ready(path) => {
-                                                    let installer_path = path.clone();
-                                                    if ui.add(
-                                                        egui::Button::new(RichText::new("Restart & Update").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
+                                                    if update.supports_auto_apply() {
+                                                        let installer_path = path.clone();
+                                                        if ui.add(
+                                                            egui::Button::new(
+                                                                RichText::new(locale_text(ui_lang, LocaleKey::UpdateRestartAndUpdate))
+                                                                    .size(FontSize::SM)
+                                                                    .color(Theme::ACCENT_PRIMARY),
+                                                            )
                                                             .fill(Color32::WHITE)
                                                             .rounding(Rounding::same(Radius::SM))
-                                                    ).clicked() {
-                                                        if let Err(e) = updater::apply_update(&installer_path) {
-                                                            tracing::error!("Failed to apply update: {}", e);
+                                                        ).clicked() {
+                                                            if let Err(e) = updater::apply_update(&installer_path) {
+                                                                tracing::error!("Failed to apply update: {}", e);
+                                                            }
                                                         }
+                                                    } else if ui.add(
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Theme::ACCENT_PRIMARY),
+                                                        )
+                                                        .fill(Color32::WHITE)
+                                                        .rounding(Rounding::same(Radius::SM))
+                                                    ).clicked() {
+                                                        open_update_destination(update);
                                                     }
                                                 }
                                                 UpdateState::Downloading(_) => {
-                                                    // Show a small spinner or just the progress in the message
                                                     ui.spinner();
                                                 }
                                                 UpdateState::Failed(_) => {
-                                                    let download_url = update.download_url.clone();
-                                                    if ui.add(
-                                                        egui::Button::new(RichText::new("Retry").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
+                                                    if update.supports_auto_download() {
+                                                        if ui.add(
+                                                            egui::Button::new(
+                                                                RichText::new(locale_text(ui_lang, LocaleKey::UpdateRetry))
+                                                                    .size(FontSize::SM)
+                                                                    .color(Theme::ACCENT_PRIMARY),
+                                                            )
                                                             .fill(Color32::WHITE)
                                                             .rounding(Rounding::same(Radius::SM))
-                                                    ).clicked() {
-                                                        // Retry download
-                                                        let state = Arc::clone(&self.state);
-                                                        let update_clone = update.clone();
-                                                        std::thread::spawn(move || {
-                                                            let rt = tokio::runtime::Runtime::new().unwrap();
-                                                            rt.block_on(async {
-                                                                if let Ok(mut s) = state.lock() {
-                                                                    s.update_state = UpdateState::Downloading(0.0);
-                                                                }
-                                                                let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
-                                                                match updater::download_update(&update_clone, progress_tx).await {
-                                                                    Ok(path) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Ready(path);
-                                                                        }
-                                                                    }
-                                                                    Err(e) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Failed(e);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            });
-                                                        });
+                                                        ).clicked() {
+                                                            start_update_download(
+                                                                Arc::clone(&self.state),
+                                                                update.clone(),
+                                                            );
+                                                        }
                                                     }
-                                                    // Also show manual download link
                                                     if ui.add(
-                                                        egui::Button::new(RichText::new("Download").size(FontSize::SM).color(Color32::WHITE))
-                                                            .fill(Color32::TRANSPARENT)
-                                                            .stroke(Stroke::new(1.0, Color32::WHITE))
-                                                            .rounding(Rounding::same(Radius::SM))
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Color32::WHITE),
+                                                        )
+                                                        .fill(Color32::TRANSPARENT)
+                                                        .stroke(Stroke::new(1.0, Color32::WHITE))
+                                                        .rounding(Rounding::same(Radius::SM))
                                                     ).clicked() {
-                                                        let _ = open::that(&download_url);
+                                                        open_update_destination(update);
                                                     }
                                                 }
                                                 _ => {
-                                                    // Available or Idle - show download button
-                                                    let update_clone = update.clone();
                                                     if ui.add(
-                                                        egui::Button::new(RichText::new("Download").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
-                                                            .fill(Color32::WHITE)
-                                                            .rounding(Rounding::same(Radius::SM))
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Theme::ACCENT_PRIMARY),
+                                                        )
+                                                        .fill(Color32::WHITE)
+                                                        .rounding(Rounding::same(Radius::SM))
                                                     ).clicked() {
-                                                        // Start download
-                                                        let state = Arc::clone(&self.state);
-                                                        std::thread::spawn(move || {
-                                                            let rt = tokio::runtime::Runtime::new().unwrap();
-                                                            rt.block_on(async {
-                                                                if let Ok(mut s) = state.lock() {
-                                                                    s.update_state = UpdateState::Downloading(0.0);
-                                                                }
-                                                                let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
-                                                                match updater::download_update(&update_clone, progress_tx).await {
-                                                                    Ok(path) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Ready(path);
-                                                                        }
-                                                                    }
-                                                                    Err(e) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Failed(e);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            });
-                                                        });
+                                                        if update.supports_auto_download() {
+                                                            start_update_download(
+                                                                Arc::clone(&self.state),
+                                                                update.clone(),
+                                                            );
+                                                        } else {
+                                                            open_update_destination(update);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2161,9 +2198,11 @@ fn draw_provider_detail_card(
                 ui.horizontal(|ui| {
                     let remaining_template = locale_text(ui_language, LocaleKey::RemainingAmount);
                     ui.label(
-                        RichText::new(remaining_template.replace("{:.2}", &format!("{:.2}", credits)))
-                            .size(FontSize::XS)
-                            .color(Theme::TEXT_PRIMARY),
+                        RichText::new(
+                            remaining_template.replace("{:.2}", &format!("{:.2}", credits)),
+                        )
+                        .size(FontSize::XS)
+                        .color(Theme::TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
@@ -2473,9 +2512,13 @@ fn draw_metric_row(
     // Info row: X% used (left) | Pace status | Resets in Xh (right) - .font(.footnote)
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(usage_display_label(display_percent, show_as_used, ui_language))
-                .size(FontSize::XS)
-                .color(Theme::TEXT_PRIMARY),
+            RichText::new(usage_display_label(
+                display_percent,
+                show_as_used,
+                ui_language,
+            ))
+            .size(FontSize::XS)
+            .color(Theme::TEXT_PRIMARY),
         );
 
         // Pace status indicator
