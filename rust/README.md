@@ -67,6 +67,7 @@ codexbar menubar
 This launches the system tray application:
 - Click the tray icon to show the usage panel
 - Use Settings to pick English or Chinese in `General`
+- Use `General -> Updates` to choose the release channel, background auto-download behavior, and whether a ready installer should run automatically when you quit CodexBar
 - Use the Providers tab to re-enable providers and review auth/account state
 - Use the Cookies, API Keys, or provider account sections to recover credentials if status stops updating
 - Use the About button for version info

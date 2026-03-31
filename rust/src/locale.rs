@@ -362,6 +362,10 @@ pub enum LocaleKey {
     UpdatesTitle,
     UpdateChannelChoice,
     UpdateChannelChoiceHelper,
+    AutoDownloadUpdates,
+    AutoDownloadUpdatesHelper,
+    InstallUpdatesOnQuit,
+    InstallUpdatesOnQuitHelper,
 
     // Keyboard shortcuts
     KeyboardShortcutsTitle,
@@ -711,6 +715,14 @@ impl LocaleKey {
             LocaleKey::UpdateChannelChoiceHelper => {
                 "Choose between stable and beta preview versions"
             }
+            LocaleKey::AutoDownloadUpdates => "Auto-download updates",
+            LocaleKey::AutoDownloadUpdatesHelper => {
+                "Download installer updates in the background when a new release is found"
+            }
+            LocaleKey::InstallUpdatesOnQuit => "Install updates on quit",
+            LocaleKey::InstallUpdatesOnQuitHelper => {
+                "Automatically launch a ready installer when you quit CodexBar"
+            }
 
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "Keyboard Shortcuts",
@@ -1044,6 +1056,10 @@ impl LocaleKey {
             LocaleKey::UpdatesTitle => "更新",
             LocaleKey::UpdateChannelChoice => "更新通道",
             LocaleKey::UpdateChannelChoiceHelper => "在稳定版与测试预览版之间选择",
+            LocaleKey::AutoDownloadUpdates => "自动下载更新",
+            LocaleKey::AutoDownloadUpdatesHelper => "发现新版本后在后台下载安装器更新",
+            LocaleKey::InstallUpdatesOnQuit => "退出时安装更新",
+            LocaleKey::InstallUpdatesOnQuitHelper => "退出 CodexBar 时自动启动已准备好的安装器",
 
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "快捷键",

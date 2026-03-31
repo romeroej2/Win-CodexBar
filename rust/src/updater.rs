@@ -3,7 +3,7 @@
 
 use crate::settings::UpdateChannel;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::watch;
 
@@ -170,19 +170,44 @@ fn is_installer_asset_name(name: &str) -> bool {
     lower.ends_with("-setup.exe") || lower.ends_with(".msi")
 }
 
+fn parse_version_triplet(v: &str) -> (u32, u32, u32) {
+    let parts: Vec<u32> = v.split('.').filter_map(|p| p.parse().ok()).collect();
+    (
+        parts.first().copied().unwrap_or(0),
+        parts.get(1).copied().unwrap_or(0),
+        parts.get(2).copied().unwrap_or(0),
+    )
+}
+
+fn installer_version_from_name(name: &str) -> Option<(u32, u32, u32)> {
+    let lower = name.to_ascii_lowercase();
+    let stem = lower
+        .strip_suffix("-setup.exe")
+        .or_else(|| lower.strip_suffix(".msi"))?;
+
+    let version_candidate = stem.split_once('-').map(|(_, rest)| rest).unwrap_or(stem);
+    let version_text: String = version_candidate
+        .chars()
+        .skip_while(|ch| !ch.is_ascii_digit())
+        .take_while(|ch| ch.is_ascii_digit() || *ch == '.')
+        .collect();
+
+    if version_text.is_empty() {
+        return None;
+    }
+
+    let version = parse_version_triplet(&version_text);
+    if version == (0, 0, 0) {
+        return None;
+    }
+
+    Some(version)
+}
+
 /// Compare semantic versions, returns true if remote is newer
 fn is_newer_version(remote: &str, current: &str) -> bool {
-    let parse_version = |v: &str| -> (u32, u32, u32) {
-        let parts: Vec<u32> = v.split('.').filter_map(|p| p.parse().ok()).collect();
-        (
-            parts.first().copied().unwrap_or(0),
-            parts.get(1).copied().unwrap_or(0),
-            parts.get(2).copied().unwrap_or(0),
-        )
-    };
-
-    let remote_v = parse_version(remote);
-    let current_v = parse_version(current);
+    let remote_v = parse_version_triplet(remote);
+    let current_v = parse_version_triplet(current);
 
     remote_v > current_v
 }
@@ -444,16 +469,37 @@ pub fn get_pending_update() -> Option<PathBuf> {
         return None;
     }
 
-    // Look for any .exe files in the updates directory
-    std::fs::read_dir(&download_dir)
+    find_pending_installer_in_dir(&download_dir)
+}
+
+fn find_pending_installer_in_dir(download_dir: &Path) -> Option<PathBuf> {
+    let current_version = parse_version_triplet(CURRENT_VERSION);
+
+    // Only treat newer installer assets as pending updates, and prefer the highest
+    // installer version when multiple cached installers are present.
+    std::fs::read_dir(download_dir)
         .ok()?
         .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .find(|path| {
-            path.extension()
-                .map(|ext| ext.eq_ignore_ascii_case("exe"))
-                .unwrap_or(false)
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_str()?;
+            let installer_version = installer_version_from_name(file_name)?;
+            if installer_version <= current_version {
+                return None;
+            }
+
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|meta| meta.modified().ok())
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|duration| duration.as_secs())
+                .unwrap_or(0);
+
+            Some(((installer_version, modified), path))
         })
+        .max_by_key(|(sort_key, _)| *sort_key)
+        .map(|(_, path)| path)
 }
 
 /// Clean up downloaded updates
@@ -529,5 +575,41 @@ mod tests {
             "https://github.com/Finesssee/Win-CodexBar/releases/tag/v1.2.6"
         );
         assert!(!update.supports_auto_apply());
+    }
+
+    #[test]
+    fn finds_newest_pending_installer_and_ignores_portable_exe() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let portable = temp.path().join("codexbar.exe");
+        let older = temp.path().join("CodexBar-1.2.7-Setup.exe");
+        let newer = temp.path().join("CodexBar-1.2.8-Setup.exe");
+
+        std::fs::write(&portable, b"portable").expect("write portable");
+        std::fs::write(&older, b"older installer").expect("write older installer");
+        std::fs::write(&newer, b"newer installer").expect("write newer installer");
+
+        let pending = find_pending_installer_in_dir(temp.path()).expect("pending installer");
+
+        assert_eq!(pending, newer);
+    }
+
+    #[test]
+    fn ignores_cached_installers_for_current_or_older_versions() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let current = temp.path().join("CodexBar-1.2.6-Setup.exe");
+        let older = temp.path().join("CodexBar-1.2.5-Setup.exe");
+
+        std::fs::write(&current, b"current installer").expect("write current installer");
+        std::fs::write(&older, b"older installer").expect("write older installer");
+
+        assert!(find_pending_installer_in_dir(temp.path()).is_none());
+    }
+
+    #[test]
+    fn parses_prerelease_installer_names_for_beta_updates() {
+        assert_eq!(
+            installer_version_from_name("CodexBar-1.2.8-beta.1-Setup.exe"),
+            Some((1, 2, 8))
+        );
     }
 }

@@ -4,6 +4,7 @@
 use eframe::egui::{
     self, Color32, FontData, FontDefinitions, FontFamily, Rect, RichText, Rounding, Stroke, Vec2,
 };
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -25,7 +26,7 @@ use crate::cost_scanner::get_daily_cost_history;
 use crate::locale::{LocaleKey, get_text as locale_text};
 use crate::login::LoginPhase;
 use crate::providers::*;
-use crate::settings::{ApiKeys, Language, ManualCookies, Settings};
+use crate::settings::{ApiKeys, Language, ManualCookies, Settings, UpdateChannel};
 use crate::shortcuts::{ShortcutManager, parse_shortcut};
 use crate::status::{StatusLevel, fetch_provider_status, get_status_page_url};
 use crate::tray::{
@@ -496,6 +497,7 @@ struct SharedState {
     update_available: Option<UpdateInfo>,
     update_checked: bool,
     update_dismissed: bool,
+    update_check_in_progress: bool,
     update_state: UpdateState,
     login_provider: Option<String>,
     login_phase: LoginPhase,
@@ -535,6 +537,90 @@ fn start_update_download(state: Arc<Mutex<SharedState>>, update: UpdateInfo) {
                         s.update_state = UpdateState::Failed(e);
                     }
                 }
+            }
+        });
+    });
+}
+
+fn start_update_check(
+    state: Arc<Mutex<SharedState>>,
+    update_channel: UpdateChannel,
+    auto_download: bool,
+) {
+    if let Ok(mut s) = state.lock() {
+        if s.update_check_in_progress {
+            return;
+        }
+        s.update_check_in_progress = true;
+    } else {
+        return;
+    }
+
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("Failed to create tokio runtime for update check: {}", e);
+                if let Ok(mut s) = state.lock() {
+                    s.update_check_in_progress = false;
+                }
+                return;
+            }
+        };
+
+        rt.block_on(async move {
+            if let Some(update) = updater::check_for_updates_with_channel(update_channel).await {
+                let should_download = {
+                    if let Ok(mut s) = state.lock() {
+                        s.update_available = Some(update.clone());
+                        s.update_checked = true;
+                        s.update_dismissed = false;
+                        s.update_state = UpdateState::Available;
+                        auto_download && update.supports_auto_download()
+                    } else {
+                        false
+                    }
+                };
+
+                if should_download {
+                    let (progress_tx, mut progress_rx) =
+                        tokio::sync::watch::channel(UpdateState::Available);
+                    let state_clone = Arc::clone(&state);
+
+                    if let Ok(mut s) = state_clone.lock() {
+                        s.update_state = UpdateState::Downloading(0.0);
+                    }
+
+                    let progress_state = Arc::clone(&state_clone);
+                    tokio::spawn(async move {
+                        while progress_rx.changed().await.is_ok() {
+                            let new_state = progress_rx.borrow().clone();
+                            if let Ok(mut s) = progress_state.lock() {
+                                s.update_state = new_state;
+                            }
+                        }
+                    });
+
+                    match updater::download_update(&update, progress_tx).await {
+                        Ok(path) => {
+                            if let Ok(mut s) = state_clone.lock() {
+                                s.update_state = UpdateState::Ready(path);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to download update: {}", e);
+                            if let Ok(mut s) = state_clone.lock() {
+                                s.update_state = UpdateState::Failed(e);
+                            }
+                        }
+                    }
+                }
+            } else if let Ok(mut s) = state.lock() {
+                s.update_checked = true;
+            }
+
+            if let Ok(mut s) = state.lock() {
+                s.update_check_in_progress = false;
             }
         });
     });
@@ -646,6 +732,7 @@ impl CodexBarApp {
             update_available: None,
             update_checked: false,
             update_dismissed: false,
+            update_check_in_progress: false,
             update_state: UpdateState::Idle,
             login_provider: None,
             login_phase: LoginPhase::Idle,
@@ -693,75 +780,11 @@ impl CodexBarApp {
         };
 
         // Check for updates in background (using configured update channel)
-        {
-            let state = Arc::clone(&state);
-            let update_channel = settings.update_channel;
-            let auto_download = settings.auto_download_updates;
-            std::thread::spawn(move || {
-                let rt = match tokio::runtime::Runtime::new() {
-                    Ok(rt) => rt,
-                    Err(e) => {
-                        tracing::error!("Failed to create tokio runtime for update check: {}", e);
-                        return;
-                    }
-                };
-                rt.block_on(async {
-                    if let Some(update) =
-                        updater::check_for_updates_with_channel(update_channel).await
-                    {
-                        let should_download = {
-                            if let Ok(mut s) = state.lock() {
-                                s.update_available = Some(update.clone());
-                                s.update_checked = true;
-                                s.update_state = UpdateState::Available;
-                                auto_download && update.supports_auto_download()
-                            } else {
-                                false
-                            }
-                        };
-
-                        // Start background download if auto-download is enabled
-                        if should_download {
-                            let (progress_tx, mut progress_rx) =
-                                tokio::sync::watch::channel(UpdateState::Available);
-                            let state_clone = Arc::clone(&state);
-
-                            // Update state to downloading
-                            if let Ok(mut s) = state_clone.lock() {
-                                s.update_state = UpdateState::Downloading(0.0);
-                            }
-
-                            // Spawn a task to monitor progress updates
-                            let progress_state = Arc::clone(&state_clone);
-                            tokio::spawn(async move {
-                                while progress_rx.changed().await.is_ok() {
-                                    let new_state = progress_rx.borrow().clone();
-                                    if let Ok(mut s) = progress_state.lock() {
-                                        s.update_state = new_state;
-                                    }
-                                }
-                            });
-
-                            match updater::download_update(&update, progress_tx).await {
-                                Ok(path) => {
-                                    if let Ok(mut s) = state_clone.lock() {
-                                        s.update_state = UpdateState::Ready(path);
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to download update: {}", e);
-                                    if let Ok(mut s) = state_clone.lock() {
-                                        s.update_state = UpdateState::Failed(e);
-                                    }
-                                }
-                            }
-                        }
-                    } else if let Ok(mut s) = state.lock() {
-                        s.update_checked = true;
-                    }
-                });
-            });
-        }
+        start_update_check(
+            Arc::clone(&state),
+            settings.update_channel,
+            settings.auto_download_updates,
+        );
 
         // Initialize keyboard shortcuts with custom shortcut from settings
         let shortcut_manager = match ShortcutManager::new() {
@@ -813,6 +836,33 @@ impl CodexBarApp {
             #[cfg(debug_assertions)]
             test_input_queue,
         }
+    }
+
+    fn pending_update_to_install_on_quit(&self) -> Option<PathBuf> {
+        let effective_settings = self.preferences_window.current_settings();
+        if !effective_settings.install_updates_on_quit {
+            return None;
+        }
+
+        let ready_update = self.state.lock().ok().and_then(|state| {
+            if let UpdateState::Ready(path) = &state.update_state {
+                Some(path.clone())
+            } else {
+                None
+            }
+        });
+
+        ready_update.or_else(updater::get_pending_update)
+    }
+
+    fn quit_application(&self) -> ! {
+        if let Some(installer_path) = self.pending_update_to_install_on_quit()
+            && let Err(e) = updater::apply_update(&installer_path)
+        {
+            tracing::error!("Failed to apply pending update on quit: {}", e);
+        }
+
+        std::process::exit(0);
     }
 
     fn layout_main_window(&mut self, ctx: &egui::Context, anchor_to_pointer: bool) {
@@ -1436,7 +1486,7 @@ impl eframe::App for CodexBarApp {
             }
             for action in tray_actions {
                 match action {
-                    TrayMenuAction::Quit => std::process::exit(0),
+                    TrayMenuAction::Quit => self.quit_application(),
                     TrayMenuAction::Open => {
                         self.pending_main_window_layout = true;
                         self.anchor_main_window_to_pointer = true;
@@ -1457,31 +1507,12 @@ impl eframe::App for CodexBarApp {
                         )));
                     }
                     TrayMenuAction::CheckForUpdates => {
-                        // Trigger update check in background
-                        let state = Arc::clone(&self.state);
-                        let update_channel = self.settings.update_channel;
-                        std::thread::spawn(move || {
-                            let rt = match tokio::runtime::Runtime::new() {
-                                Ok(rt) => rt,
-                                Err(e) => {
-                                    tracing::error!("Failed to create runtime: {}", e);
-                                    return;
-                                }
-                            };
-                            rt.block_on(async {
-                                if let Some(update) =
-                                    updater::check_for_updates_with_channel(update_channel).await
-                                {
-                                    if let Ok(mut s) = state.lock() {
-                                        s.update_available = Some(update);
-                                        s.update_checked = true;
-                                        s.update_dismissed = false;
-                                    }
-                                } else if let Ok(mut s) = state.lock() {
-                                    s.update_checked = true;
-                                }
-                            });
-                        });
+                        let effective_settings = self.preferences_window.current_settings();
+                        start_update_check(
+                            Arc::clone(&self.state),
+                            effective_settings.update_channel,
+                            effective_settings.auto_download_updates,
+                        );
                     }
                     TrayMenuAction::ToggleProvider(provider_name) => {
                         // Toggle provider enabled state
@@ -1941,7 +1972,7 @@ impl eframe::App for CodexBarApp {
                         self.preferences_window.open();
                     }
                     if draw_text_menu_item(ui, locale_text(self.settings.ui_language, LocaleKey::MenuQuit), self.settings.ui_language) {
-                        std::process::exit(0);
+                        self.quit_application();
                     }
                 }); // end ScrollArea
             });

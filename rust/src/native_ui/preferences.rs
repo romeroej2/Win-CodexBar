@@ -257,6 +257,14 @@ impl PreferencesWindow {
         None
     }
 
+    pub fn current_settings(&self) -> Settings {
+        if let Ok(state) = self.shared_state.lock() {
+            state.settings.clone()
+        } else {
+            self.settings.clone()
+        }
+    }
+
     /// Reload the cached snapshot from disk (call after refresh completes)
     pub fn reload_snapshot(&mut self) {
         if let Ok(mut state) = self.shared_state.lock() {
@@ -3832,20 +3840,23 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
     ui.add_space(Spacing::LG);
 
-    section_header(ui, "Updates");
+    section_header(ui, locale_text(ui_language, LocaleKey::UpdatesTitle));
 
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("更新通道")
+                    RichText::new(locale_text(ui_language, LocaleKey::UpdateChannelChoice))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("在稳定版与测试预览版之间选择")
-                        .size(FontSize::SM)
-                        .color(Theme::TEXT_MUTED),
+                    RichText::new(locale_text(
+                        ui_language,
+                        LocaleKey::UpdateChannelChoiceHelper,
+                    ))
+                    .size(FontSize::SM)
+                    .color(Theme::TEXT_MUTED),
                 );
             });
 
@@ -3863,8 +3874,14 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                     .inner_margin(egui::Margin::symmetric(Spacing::XS, 2.0))
                     .show(ui, |ui| {
                         let channels = [
-                            (crate::settings::UpdateChannel::Stable, "Stable"),
-                            (crate::settings::UpdateChannel::Beta, "Beta"),
+                            (
+                                crate::settings::UpdateChannel::Stable,
+                                locale_text(ui_language, LocaleKey::UpdateChannelStable),
+                            ),
+                            (
+                                crate::settings::UpdateChannel::Beta,
+                                locale_text(ui_language, LocaleKey::UpdateChannelBeta),
+                            ),
                         ];
 
                         let mut selected = current_channel;
@@ -3874,7 +3891,10 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                                     .iter()
                                     .find(|(ch, _)| *ch == selected)
                                     .map(|(_, label)| *label)
-                                    .unwrap_or("Stable"),
+                                    .unwrap_or(locale_text(
+                                        ui_language,
+                                        LocaleKey::UpdateChannelStable,
+                                    )),
                             )
                             .show_ui(ui, |ui| {
                                 for (channel, label) in channels {
@@ -3888,6 +3908,44 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                             });
                     });
             });
+
+            setting_divider(ui);
+
+            let mut auto_download_updates = if let Ok(state) = shared_state.lock() {
+                state.settings.auto_download_updates
+            } else {
+                true
+            };
+
+            if setting_toggle(
+                ui,
+                locale_text(ui_language, LocaleKey::AutoDownloadUpdates),
+                locale_text(ui_language, LocaleKey::AutoDownloadUpdatesHelper),
+                &mut auto_download_updates,
+            ) && let Ok(mut state) = shared_state.lock()
+            {
+                state.settings.auto_download_updates = auto_download_updates;
+                state.settings_changed = true;
+            }
+
+            setting_divider(ui);
+
+            let mut install_updates_on_quit = if let Ok(state) = shared_state.lock() {
+                state.settings.install_updates_on_quit
+            } else {
+                false
+            };
+
+            if setting_toggle(
+                ui,
+                locale_text(ui_language, LocaleKey::InstallUpdatesOnQuit),
+                locale_text(ui_language, LocaleKey::InstallUpdatesOnQuitHelper),
+                &mut install_updates_on_quit,
+            ) && let Ok(mut state) = shared_state.lock()
+            {
+                state.settings.install_updates_on_quit = install_updates_on_quit;
+                state.settings_changed = true;
+            }
         });
     });
 
