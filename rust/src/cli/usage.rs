@@ -11,7 +11,7 @@ use crate::providers::{
     OpenCodeProvider, OpenRouterProvider, SyntheticProvider, VertexAIProvider, WarpProvider,
     ZaiProvider,
 };
-use crate::status::{fetch_provider_status, ProviderStatus as StatusInfo, StatusLevel};
+use crate::status::{ProviderStatus as StatusInfo, StatusLevel, fetch_provider_status};
 
 /// Arguments for the usage command
 #[derive(Args, Debug, Default)]
@@ -326,10 +326,11 @@ pub fn render_text_with_status(
     lines.push(header);
 
     // Status description if available
-    if let Some(s) = status {
-        if s.level != StatusLevel::Operational && s.level != StatusLevel::Unknown {
-            lines.push(format!("  Status: {}", s.description));
-        }
+    if let Some(s) = status
+        && s.level != StatusLevel::Operational
+        && s.level != StatusLevel::Unknown
+    {
+        lines.push(format!("  Status: {}", s.description));
     }
 
     // Account info

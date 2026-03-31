@@ -22,9 +22,10 @@ use crate::core::{
 };
 use crate::core::{TokenAccountStore, TokenAccountSupport};
 use crate::cost_scanner::get_daily_cost_history;
+use crate::locale::{LocaleKey, get_text as locale_text};
 use crate::login::LoginPhase;
 use crate::providers::*;
-use crate::settings::{ApiKeys, ManualCookies, Settings};
+use crate::settings::{ApiKeys, Language, ManualCookies, Settings};
 use crate::shortcuts::{ShortcutManager, parse_shortcut};
 use crate::status::{StatusLevel, fetch_provider_status, get_status_page_url};
 use crate::tray::{
@@ -72,6 +73,48 @@ fn show_main_window_no_focus() {}
 
 #[cfg(not(windows))]
 fn restore_main_window() {}
+
+#[cfg(windows)]
+fn is_remote_session() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_REMOTESESSION};
+
+    unsafe { GetSystemMetrics(SM_REMOTESESSION) != 0 }
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn remote_session_error_message() -> &'static str {
+    "CodexBar can't render its native window inside a Windows Remote Desktop session on this machine.\n\nRun it from the local desktop session instead, or use the CLI while connected over RDP:\n\n  codexbar usage -p claude\n\nThe startup log is written to %TEMP%\\codexbar_launch.log."
+}
+
+#[cfg(windows)]
+fn show_remote_session_error_dialog() {
+    use windows::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
+    use windows::core::{HSTRING, w};
+
+    let message = HSTRING::from(remote_session_error_message());
+
+    unsafe {
+        let _ = MessageBoxW(None, &message, w!("CodexBar"), MB_OK | MB_ICONERROR);
+    }
+}
+
+fn build_native_options() -> eframe::NativeOptions {
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size([360.0, 500.0])
+        .with_min_inner_size([320.0, 320.0])
+        .with_clamp_size_to_monitor_size(true)
+        .with_resizable(true)
+        .with_decorations(true)
+        .with_transparent(false)
+        .with_always_on_top()
+        .with_title("CodexBar");
+
+    eframe::NativeOptions {
+        viewport,
+        persist_window: false, // Don't persist window state
+        ..Default::default()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ProviderData {
@@ -132,6 +175,7 @@ impl ProviderData {
         result: &ProviderFetchResult,
         metadata: &crate::core::ProviderMetadata,
         reset_time_relative: bool,
+        ui_language: Language,
     ) -> Self {
         let snapshot = &result.usage;
         let (pace_percent, pace_lasts) = calculate_pace(&snapshot.primary);
@@ -162,11 +206,11 @@ impl ProviderData {
             session_reset: snapshot
                 .primary
                 .resets_at
-                .map(|t| format_reset_time(t, reset_time_relative)),
+                .map(|t| format_reset_time(t, reset_time_relative, ui_language)),
             weekly_percent: snapshot.secondary.as_ref().map(|s| s.used_percent),
             weekly_reset: snapshot.secondary.as_ref().and_then(|s| {
                 s.resets_at
-                    .map(|t| format_reset_time(t, reset_time_relative))
+                    .map(|t| format_reset_time(t, reset_time_relative, ui_language))
             }),
             model_percent: snapshot.model_specific.as_ref().map(|m| m.used_percent),
             model_name: snapshot
@@ -260,13 +304,17 @@ impl ProviderData {
     }
 }
 
-fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> String {
+fn format_reset_time(
+    reset: chrono::DateTime<chrono::Utc>,
+    relative: bool,
+    lang: Language,
+) -> String {
     if relative {
         let now = chrono::Utc::now();
         let diff = reset - now;
 
         if diff.num_seconds() <= 0 {
-            return "正在重置...".to_string();
+            return locale_text(lang, LocaleKey::ResetInProgress).to_string();
         }
 
         let hours = diff.num_hours();
@@ -290,7 +338,10 @@ fn format_reset_time(reset: chrono::DateTime<chrono::Utc>, relative: bool) -> St
         if reset_date == today {
             local_time.format("%I:%M %p").to_string()
         } else if reset_date == today + chrono::Days::new(1) {
-            format!("明天 {}", local_time.format("%I:%M %p"))
+            let tomorrow_template = locale_text(lang, LocaleKey::TomorrowAt);
+            tomorrow_template
+                .replace("{}", &local_time.format("%I:%M %p").to_string())
+                .to_string()
         } else {
             local_time.format("%b %d, %I:%M %p").to_string()
         }
@@ -337,11 +388,13 @@ fn usage_display_percent(used_percent: f64, show_as_used: bool) -> f64 {
     }
 }
 
-fn usage_display_label(display_percent: f64, show_as_used: bool) -> String {
+fn usage_display_label(display_percent: f64, show_as_used: bool, lang: Language) -> String {
     if show_as_used {
-        format!("已使用 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::UsedPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     } else {
-        format!("剩余 {:.0}%", display_percent)
+        locale_text(lang, LocaleKey::RemainingPercent)
+            .replace("{:.0}", &format!("{:.0}", display_percent))
     }
 }
 
@@ -447,6 +500,44 @@ struct SharedState {
     login_provider: Option<String>,
     login_phase: LoginPhase,
     login_message: Option<String>,
+}
+
+fn open_update_destination(update: &UpdateInfo) {
+    let _ = open::that(&update.download_url);
+}
+
+fn start_update_download(state: Arc<Mutex<SharedState>>, update: UpdateInfo) {
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("Failed to create runtime for update download: {}", e);
+                if let Ok(mut s) = state.lock() {
+                    s.update_state = UpdateState::Failed(e.to_string());
+                }
+                return;
+            }
+        };
+
+        rt.block_on(async move {
+            if let Ok(mut s) = state.lock() {
+                s.update_state = UpdateState::Downloading(0.0);
+            }
+            let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
+            match updater::download_update(&update, progress_tx).await {
+                Ok(path) => {
+                    if let Ok(mut s) = state.lock() {
+                        s.update_state = UpdateState::Ready(path);
+                    }
+                }
+                Err(e) => {
+                    if let Ok(mut s) = state.lock() {
+                        s.update_state = UpdateState::Failed(e);
+                    }
+                }
+            }
+        });
+    });
 }
 
 pub struct CodexBarApp {
@@ -623,7 +714,7 @@ impl CodexBarApp {
                                 s.update_available = Some(update.clone());
                                 s.update_checked = true;
                                 s.update_state = UpdateState::Available;
-                                auto_download
+                                auto_download && update.supports_auto_download()
                             } else {
                                 false
                             }
@@ -796,6 +887,7 @@ impl CodexBarApp {
         let manual_cookies = ManualCookies::load();
         let api_keys = ApiKeys::load();
         let reset_time_relative = self.settings.reset_time_relative;
+        let ui_language = self.settings.ui_language;
         // Load token accounts for account switching support
         let token_accounts = TokenAccountStore::new().load().unwrap_or_default();
 
@@ -923,6 +1015,7 @@ impl CodexBarApp {
                                     &result,
                                     &metadata,
                                     reset_time_relative,
+                                    ui_language,
                                 ),
                                 Ok(Err(e)) => ProviderData::from_error(id, e.to_string()),
                                 Err(_) => ProviderData::from_error(id, "Timeout".to_string()),
@@ -949,10 +1042,10 @@ impl CodexBarApp {
                                     load_credits_history_points(id, result.account.as_deref());
                             }
 
-                            if let Ok(mut s) = state.lock() {
-                                if idx < s.providers.len() {
-                                    s.providers[idx] = result;
-                                }
+                            if let Ok(mut s) = state.lock()
+                                && idx < s.providers.len()
+                            {
+                                s.providers[idx] = result;
                             }
                         })
                     })
@@ -1452,18 +1545,23 @@ impl eframe::App for CodexBarApp {
                                         ui.add_space(Spacing::XS);
 
                                         // Message based on state
+                                        let ui_lang = self.settings.ui_language;
                                         let message = match &update_download_state {
                                             UpdateState::Downloading(progress) => {
-                                                format!("Downloading {} ({:.0}%)", update.version, progress * 100.0)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateDownloadingMessage);
+                                                template.replace("{}", &update.version).replace("{:.0}", &format!("{:.0}", progress * 100.0))
                                             }
                                             UpdateState::Ready(_) => {
-                                                format!("Update {} ready to install", update.version)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateReadyMessage);
+                                                template.replace("{}", &update.version)
                                             }
                                             UpdateState::Failed(e) => {
-                                                format!("Update failed: {}", e)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateFailedMessage);
+                                                template.replace("{}", e)
                                             }
                                             _ => {
-                                                format!("Update available: {}", update.version)
+                                                let template = locale_text(ui_lang, LocaleKey::UpdateAvailableMessage);
+                                                template.replace("{}", &update.version)
                                             }
                                         };
                                         ui.label(
@@ -1475,107 +1573,94 @@ impl eframe::App for CodexBarApp {
 
                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                             // Dismiss button
-                                            if ui.add(
-                                                egui::Button::new(RichText::new("✕").size(FontSize::SM).color(Color32::WHITE))
-                                                    .fill(Color32::TRANSPARENT)
-                                                    .stroke(Stroke::NONE)
-                                            ).clicked() {
-                                                if let Ok(mut s) = self.state.lock() {
-                                                    s.update_dismissed = true;
-                                                }
+                                        if ui.add(
+                                            egui::Button::new(RichText::new("✕").size(FontSize::SM).color(Color32::WHITE))
+                                                .fill(Color32::TRANSPARENT)
+                                                .stroke(Stroke::NONE)
+                                        ).clicked()
+                                            && let Ok(mut s) = self.state.lock() {
+                                                s.update_dismissed = true;
                                             }
 
                                             // Action button based on state
                                             match &update_download_state {
                                                 UpdateState::Ready(path) => {
-                                                    let installer_path = path.clone();
-                                                    if ui.add(
-                                                        egui::Button::new(RichText::new("Restart & Update").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
+                                                    if update.supports_auto_apply() {
+                                                        let installer_path = path.clone();
+                                                        if ui.add(
+                                                            egui::Button::new(
+                                                                RichText::new(locale_text(ui_lang, LocaleKey::UpdateRestartAndUpdate))
+                                                                    .size(FontSize::SM)
+                                                                    .color(Theme::ACCENT_PRIMARY),
+                                                            )
                                                             .fill(Color32::WHITE)
                                                             .rounding(Rounding::same(Radius::SM))
+                                                        ).clicked()
+                                                            && let Err(e) = updater::apply_update(&installer_path) {
+                                                                tracing::error!("Failed to apply update: {}", e);
+                                                            }
+                                                    } else if ui.add(
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Theme::ACCENT_PRIMARY),
+                                                        )
+                                                        .fill(Color32::WHITE)
+                                                        .rounding(Rounding::same(Radius::SM))
                                                     ).clicked() {
-                                                        if let Err(e) = updater::apply_update(&installer_path) {
-                                                            tracing::error!("Failed to apply update: {}", e);
-                                                        }
+                                                        open_update_destination(update);
                                                     }
                                                 }
                                                 UpdateState::Downloading(_) => {
-                                                    // Show a small spinner or just the progress in the message
                                                     ui.spinner();
                                                 }
                                                 UpdateState::Failed(_) => {
-                                                    let download_url = update.download_url.clone();
-                                                    if ui.add(
-                                                        egui::Button::new(RichText::new("Retry").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
+                                                    if update.supports_auto_download()
+                                                        && ui.add(
+                                                            egui::Button::new(
+                                                                RichText::new(locale_text(ui_lang, LocaleKey::UpdateRetry))
+                                                                    .size(FontSize::SM)
+                                                                    .color(Theme::ACCENT_PRIMARY),
+                                                            )
                                                             .fill(Color32::WHITE)
                                                             .rounding(Rounding::same(Radius::SM))
-                                                    ).clicked() {
-                                                        // Retry download
-                                                        let state = Arc::clone(&self.state);
-                                                        let update_clone = update.clone();
-                                                        std::thread::spawn(move || {
-                                                            let rt = tokio::runtime::Runtime::new().unwrap();
-                                                            rt.block_on(async {
-                                                                if let Ok(mut s) = state.lock() {
-                                                                    s.update_state = UpdateState::Downloading(0.0);
-                                                                }
-                                                                let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
-                                                                match updater::download_update(&update_clone, progress_tx).await {
-                                                                    Ok(path) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Ready(path);
-                                                                        }
-                                                                    }
-                                                                    Err(e) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Failed(e);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            });
-                                                        });
-                                                    }
-                                                    // Also show manual download link
+                                                        ).clicked() {
+                                                            start_update_download(
+                                                                Arc::clone(&self.state),
+                                                                update.clone(),
+                                                            );
+                                                        }
                                                     if ui.add(
-                                                        egui::Button::new(RichText::new("Download").size(FontSize::SM).color(Color32::WHITE))
-                                                            .fill(Color32::TRANSPARENT)
-                                                            .stroke(Stroke::new(1.0, Color32::WHITE))
-                                                            .rounding(Rounding::same(Radius::SM))
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Color32::WHITE),
+                                                        )
+                                                        .fill(Color32::TRANSPARENT)
+                                                        .stroke(Stroke::new(1.0, Color32::WHITE))
+                                                        .rounding(Rounding::same(Radius::SM))
                                                     ).clicked() {
-                                                        let _ = open::that(&download_url);
+                                                        open_update_destination(update);
                                                     }
                                                 }
                                                 _ => {
-                                                    // Available or Idle - show download button
-                                                    let update_clone = update.clone();
                                                     if ui.add(
-                                                        egui::Button::new(RichText::new("Download").size(FontSize::SM).color(Theme::ACCENT_PRIMARY))
-                                                            .fill(Color32::WHITE)
-                                                            .rounding(Rounding::same(Radius::SM))
+                                                        egui::Button::new(
+                                                            RichText::new(locale_text(ui_lang, LocaleKey::UpdateDownload))
+                                                                .size(FontSize::SM)
+                                                                .color(Theme::ACCENT_PRIMARY),
+                                                        )
+                                                        .fill(Color32::WHITE)
+                                                        .rounding(Rounding::same(Radius::SM))
                                                     ).clicked() {
-                                                        // Start download
-                                                        let state = Arc::clone(&self.state);
-                                                        std::thread::spawn(move || {
-                                                            let rt = tokio::runtime::Runtime::new().unwrap();
-                                                            rt.block_on(async {
-                                                                if let Ok(mut s) = state.lock() {
-                                                                    s.update_state = UpdateState::Downloading(0.0);
-                                                                }
-                                                                let (progress_tx, _) = tokio::sync::watch::channel(UpdateState::Available);
-                                                                match updater::download_update(&update_clone, progress_tx).await {
-                                                                    Ok(path) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Ready(path);
-                                                                        }
-                                                                    }
-                                                                    Err(e) => {
-                                                                        if let Ok(mut s) = state.lock() {
-                                                                            s.update_state = UpdateState::Failed(e);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            });
-                                                        });
+                                                        if update.supports_auto_download() {
+                                                            start_update_download(
+                                                                Arc::clone(&self.state),
+                                                                update.clone(),
+                                                            );
+                                                        } else {
+                                                            open_update_destination(update);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1704,11 +1789,10 @@ impl eframe::App for CodexBarApp {
                                             ui.painter().circle_filled(dot_center, dot_radius, dot_color);
                                         }
 
-                                        if response.clicked() {
-                                            if let Ok(mut state) = self.state.lock() {
+                                        if response.clicked()
+                                            && let Ok(mut state) = self.state.lock() {
                                                 state.selected_provider_idx = *original_idx;
                                             }
-                                        }
 
                                         // End row after 4 columns
                                         if (i + 1) % columns == 0 {
@@ -1735,6 +1819,7 @@ impl eframe::App for CodexBarApp {
                             let show_credits = self.settings.show_credits_extra_usage;
                             let show_as_used = self.settings.show_as_used;
                             let hide_personal_info = self.settings.hide_personal_info;
+                            let ui_language = self.settings.ui_language;
                             if let Some((_, selected_provider)) = visible_providers.iter().find(|(idx, _)| *idx == selected_idx) {
                                 let (refresh, switch) = draw_provider_detail_card(
                                     ui,
@@ -1743,6 +1828,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    ui_language,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1755,6 +1841,7 @@ impl eframe::App for CodexBarApp {
                                     show_credits,
                                     show_as_used,
                                     hide_personal_info,
+                                    ui_language,
                                 );
                                 manual_refresh_requested = refresh;
                                 account_switch_provider = switch;
@@ -1766,13 +1853,12 @@ impl eframe::App for CodexBarApp {
                             }
 
                             // Handle account switch request - open preferences to Providers tab with provider selected
-                            if let Some(provider_name) = account_switch_provider {
-                                if let Some(provider_id) = ProviderId::from_cli_name(&provider_name) {
+                            if let Some(provider_name) = account_switch_provider
+                                && let Some(provider_id) = ProviderId::from_cli_name(&provider_name) {
                                     self.preferences_window.active_tab = super::preferences::PreferencesTab::Providers;
                                     self.preferences_window.selected_provider = Some(provider_id);
                                     self.preferences_window.open();
                                 }
-                            }
                         } else if is_refreshing {
                             egui::Frame::none()
                                 .fill(Theme::CARD_BG)
@@ -1784,7 +1870,7 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(locale_text(self.settings.ui_language, LocaleKey::StateLoadingProviders))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1799,7 +1885,7 @@ impl eframe::App for CodexBarApp {
                                 .show(ui, |ui| {
                                     ui.vertical_centered(|ui| {
                                         ui.label(
-                                            RichText::new("暂无服务商数据。")
+                                            RichText::new(locale_text(self.settings.ui_language, LocaleKey::StateNoProviderData))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
@@ -1819,18 +1905,18 @@ impl eframe::App for CodexBarApp {
                                         ui.spinner();
                                         ui.add_space(Spacing::SM);
                                         ui.label(
-                                            RichText::new("正在加载服务商...")
+                                            RichText::new(locale_text(self.settings.ui_language, LocaleKey::StateLoadingProviders))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                     } else {
                                         ui.label(
-                                            RichText::new("尚未选择服务商。")
+                                            RichText::new(locale_text(self.settings.ui_language, LocaleKey::StateNoProviderSelected))
                                                 .size(FontSize::BASE)
                                                 .color(Theme::TEXT_MUTED),
                                         );
                                         ui.add_space(Spacing::SM);
-                                        if ui.button("打开服务商设置").clicked() {
+                                        if ui.button(locale_text(self.settings.ui_language, LocaleKey::ButtonOpenProviderSettings)).clicked() {
                                             self.preferences_window.active_tab = super::preferences::PreferencesTab::Providers;
                                             self.preferences_window.open();
                                         }
@@ -1847,14 +1933,14 @@ impl eframe::App for CodexBarApp {
                     draw_horizontal_separator(ui, 0.0);
                     ui.add_space(4.0);
 
-                    if draw_text_menu_item(ui, "设置...") {
+                    if draw_text_menu_item(ui, locale_text(self.settings.ui_language, LocaleKey::MenuSettings), self.settings.ui_language) {
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "关于 CodexBar") {
+                    if draw_text_menu_item(ui, locale_text(self.settings.ui_language, LocaleKey::MenuAbout), self.settings.ui_language) {
                         self.preferences_window.active_tab = super::preferences::PreferencesTab::About;
                         self.preferences_window.open();
                     }
-                    if draw_text_menu_item(ui, "退出") {
+                    if draw_text_menu_item(ui, locale_text(self.settings.ui_language, LocaleKey::MenuQuit), self.settings.ui_language) {
                         std::process::exit(0);
                     }
                 }); // end ScrollArea
@@ -1865,16 +1951,22 @@ impl eframe::App for CodexBarApp {
 
         let mut refresh_requested = self.preferences_window.take_refresh_requested();
         let previous_enabled_provider_ids = self.settings.get_enabled_provider_ids();
+        let previous_ui_language = self.settings.ui_language;
 
         // Atomically consume settings changes so the flag is cleared in both
         // PreferencesWindow and the shared viewport state in one shot.
         if let Some(new_settings) = self.preferences_window.take_settings_if_changed() {
+            let language_changed = new_settings.ui_language != previous_ui_language;
             self.settings = new_settings;
             if let Err(e) = self.settings.save() {
                 tracing::error!("Failed to save settings: {}", e);
             }
             if previous_enabled_provider_ids != self.settings.get_enabled_provider_ids() {
                 refresh_requested = true;
+            }
+            // If language changed, refresh the tray menu/tooltip to update localized strings
+            if language_changed && let Some(ref tray_manager) = self.tray_manager {
+                tray_manager.refresh_language();
             }
         }
 
@@ -1905,12 +1997,11 @@ fn draw_provider_detail_card(
     show_credits_extra: bool,
     show_as_used: bool,
     hide_personal_info: bool,
+    ui_language: Language,
 ) -> (bool, Option<String>) {
     let mut refresh_requested = false;
     let mut account_switch_requested: Option<String> = None;
     let brand_color = provider_color(&provider.name);
-    let content_width = ui.available_width() - 32.0; // 16px padding each side
-
     // Main VStack with spacing: 4 (compact)
     ui.vertical(|ui| {
         ui.add_space(1.0); // Top padding
@@ -1964,7 +2055,7 @@ fn draw_provider_detail_card(
                         );
                     } else {
                         ui.label(
-                            RichText::new("刚刚更新")
+                            RichText::new(locale_text(ui_language, LocaleKey::StatusJustUpdated))
                                 .size(FontSize::XS)
                                 .color(Theme::TEXT_SECONDARY),
                         );
@@ -1984,20 +2075,23 @@ fn draw_provider_detail_card(
                 });
 
                 // Row 3: Status description (if non-Operational)
-                if provider.status_level != StatusLevel::Operational
-                    && provider.status_level != StatusLevel::Unknown
-                {
-                    if let Some(ref status_desc) = provider.status_description {
+                match &provider.status_description {
+                    Some(status_desc)
+                        if provider.status_level != StatusLevel::Operational
+                            && provider.status_level != StatusLevel::Unknown =>
+                    {
                         ui.add_space(2.0);
                         ui.horizontal(|ui| {
                             let status_col = status_color(provider.status_level);
+                            let status_template = locale_text(ui_language, LocaleKey::StatusLabel);
                             ui.label(
-                                RichText::new(format!("状态：{}", status_desc))
+                                RichText::new(status_template.replace("{}", status_desc))
                                     .size(FontSize::XS)
                                     .color(status_col),
                             );
                         });
                     }
+                    _ => {}
                 }
             });
         });
@@ -2026,14 +2120,16 @@ fn draw_provider_detail_card(
             if let Some(session_pct) = provider.session_percent {
                 draw_metric_row(
                     ui,
-                    "会话",
-                    session_pct,
-                    show_as_used,
-                    provider.session_reset.as_deref(),
-                    brand_color,
-                    content_width,
-                    None, // No pace for session
-                    false,
+                    MetricRow {
+                        title: locale_text(ui_language, LocaleKey::ProviderSession),
+                        percent: session_pct,
+                        show_as_used,
+                        reset_text: provider.session_reset.as_deref(),
+                        color: brand_color,
+                        pace_percent: None, // No pace for session
+                        pace_lasts_to_reset: false,
+                        ui_language,
+                    },
                 );
             }
 
@@ -2043,14 +2139,16 @@ fn draw_provider_detail_card(
 
                 draw_metric_row(
                     ui,
-                    "周度",
-                    weekly_pct,
-                    show_as_used,
-                    provider.weekly_reset.as_deref(),
-                    brand_color,
-                    content_width,
-                    provider.pace_percent,
-                    provider.pace_lasts_to_reset,
+                    MetricRow {
+                        title: locale_text(ui_language, LocaleKey::ProviderWeekly),
+                        percent: weekly_pct,
+                        show_as_used,
+                        reset_text: provider.weekly_reset.as_deref(),
+                        color: brand_color,
+                        pace_percent: provider.pace_percent,
+                        pace_lasts_to_reset: provider.pace_lasts_to_reset,
+                        ui_language,
+                    },
                 );
             }
 
@@ -2058,17 +2156,22 @@ fn draw_provider_detail_card(
             if let Some(model_pct) = provider.model_percent {
                 ui.add_space(12.0);
 
-                let model_label = provider.model_name.as_deref().unwrap_or("模型");
+                let model_label = provider
+                    .model_name
+                    .as_deref()
+                    .unwrap_or(locale_text(ui_language, LocaleKey::ProviderModel));
                 draw_metric_row(
                     ui,
-                    model_label,
-                    model_pct,
-                    show_as_used,
-                    None,
-                    brand_color,
-                    content_width,
-                    None, // No pace for model
-                    false,
+                    MetricRow {
+                        title: model_label,
+                        percent: model_pct,
+                        show_as_used,
+                        reset_text: None,
+                        color: brand_color,
+                        pace_percent: None, // No pace for model
+                        pace_lasts_to_reset: false,
+                        ui_language,
+                    },
                 );
             }
 
@@ -2078,7 +2181,7 @@ fn draw_provider_detail_card(
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(
-                    RichText::new("无法获取用量")
+                    RichText::new(locale_text(ui_language, LocaleKey::StatusUnableToGetUsage))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_SECONDARY),
                 );
@@ -2089,80 +2192,79 @@ fn draw_provider_detail_card(
         // ═══════════════════════════════════════════════════════════════════
         // CREDITS SECTION - macOS CreditsBarContent style
         // ═══════════════════════════════════════════════════════════════════
-        if show_credits_extra {
-            if let Some(credits) = provider.credits_remaining {
-                if has_metrics {
-                    draw_horizontal_separator(ui, 0.0);
-                }
-                ui.add_space(12.0);
+        if show_credits_extra && let Some(credits) = provider.credits_remaining {
+            if has_metrics {
+                draw_horizontal_separator(ui, 0.0);
+            }
+            ui.add_space(12.0);
 
-                let bar_width = ui.available_width();
+            let bar_width = ui.available_width();
 
-                // Title: "Credits" - .font(.body).fontWeight(.medium)
-                ui.label(
-                    RichText::new("额度")
-                        .size(FontSize::BASE)
-                        .color(Theme::TEXT_PRIMARY)
-                        .strong(),
-                );
+            // Title: "Credits" - .font(.body).fontWeight(.medium)
+            ui.label(
+                RichText::new(locale_text(ui_language, LocaleKey::CreditsTitle))
+                    .size(FontSize::BASE)
+                    .color(Theme::TEXT_PRIMARY)
+                    .strong(),
+            );
 
-                // Progress bar
-                if let Some(credits_pct) = provider.credits_percent {
-                    ui.add_space(6.0);
-                    let bar_height = 8.0;
-                    let (rect, _) = ui.allocate_exact_size(
-                        Vec2::new(bar_width, bar_height),
-                        egui::Sense::hover(),
-                    );
+            // Progress bar
+            if let Some(credits_pct) = provider.credits_percent {
+                ui.add_space(6.0);
+                let bar_height = 8.0;
+                let (rect, _) =
+                    ui.allocate_exact_size(Vec2::new(bar_width, bar_height), egui::Sense::hover());
 
+                ui.painter()
+                    .rect_filled(rect, Rounding::same(4.0), Theme::progress_track());
+
+                let fill_w = rect.width() * (credits_pct as f32 / 100.0).clamp(0.0, 1.0);
+                if fill_w > 0.0 {
+                    let fill_rect = Rect::from_min_size(rect.min, Vec2::new(fill_w, bar_height));
                     ui.painter()
-                        .rect_filled(rect, Rounding::same(4.0), Theme::progress_track());
-
-                    let fill_w = rect.width() * (credits_pct as f32 / 100.0).clamp(0.0, 1.0);
-                    if fill_w > 0.0 {
-                        let fill_rect =
-                            Rect::from_min_size(rect.min, Vec2::new(fill_w, bar_height));
-                        ui.painter()
-                            .rect_filled(fill_rect, Rounding::same(4.0), brand_color);
-                    }
+                        .rect_filled(fill_rect, Rounding::same(4.0), brand_color);
                 }
+            }
 
-                // Info row: X left (left) | 1K tokens (right) - .font(.caption)
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
+            // Info row: X left (left) | 1K tokens (right) - .font(.caption)
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                let remaining_template = locale_text(ui_language, LocaleKey::RemainingAmount);
+                ui.label(
+                    RichText::new(remaining_template.replace("{:.2}", &format!("{:.2}", credits)))
+                        .size(FontSize::XS)
+                        .color(Theme::TEXT_PRIMARY),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
-                        RichText::new(format!("剩余 {:.2}", credits))
+                        RichText::new(locale_text(ui_language, LocaleKey::Tokens1K))
                             .size(FontSize::XS)
-                            .color(Theme::TEXT_PRIMARY),
+                            .color(Theme::TEXT_SECONDARY),
                     );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(
-                            RichText::new("1K tokens")
-                                .size(FontSize::XS)
-                                .color(Theme::TEXT_SECONDARY),
-                        );
-                    });
                 });
+            });
 
-                // Buy Credits link
-                ui.add_space(6.0);
-                if draw_menu_item(ui, "⊕", "购买额度...") {
-                    if let Some(ref url) = provider.dashboard_url {
-                        let _ = open::that(url);
-                    }
-                }
+            // Buy Credits link
+            ui.add_space(6.0);
+            if draw_menu_item(
+                ui,
+                "⊕",
+                locale_text(ui_language, LocaleKey::ActionBuyCredits),
+            ) && let Some(ref url) = provider.dashboard_url
+            {
+                let _ = open::that(url);
+            }
 
-                // Credits history chart
-                if !provider.credits_history.is_empty() {
-                    ui.add_space(8.0);
-                    let chart_points: Vec<ChartPoint> = provider
-                        .credits_history
-                        .iter()
-                        .map(|(date, value)| ChartPoint::new(date.clone(), *value))
-                        .collect();
-                    let mut chart = CreditsHistoryChart::new(chart_points);
-                    chart.show(ui);
-                }
+            // Credits history chart
+            if !provider.credits_history.is_empty() {
+                ui.add_space(8.0);
+                let chart_points: Vec<ChartPoint> = provider
+                    .credits_history
+                    .iter()
+                    .map(|(date, value)| ChartPoint::new(date.clone(), *value))
+                    .collect();
+                let mut chart = CreditsHistoryChart::new(chart_points);
+                chart.show(ui);
             }
         }
 
@@ -2176,7 +2278,7 @@ fn draw_provider_detail_card(
             ui.add_space(12.0);
 
             ui.label(
-                RichText::new("用量明细")
+                RichText::new(locale_text(ui_language, LocaleKey::SectionUsageBreakdown))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2199,7 +2301,7 @@ fn draw_provider_detail_card(
 
             // Title: "Cost" - .font(.body).fontWeight(.medium)
             ui.label(
-                RichText::new("费用")
+                RichText::new(locale_text(ui_language, LocaleKey::SectionCost))
                     .size(FontSize::BASE)
                     .color(Theme::TEXT_PRIMARY)
                     .strong(),
@@ -2212,13 +2314,15 @@ fn draw_provider_detail_card(
                 let total_30d: f64 = provider.cost_history.iter().map(|(_, cost)| cost).sum();
                 let today_cost: f64 = provider.cost_history.last().map(|(_, c)| *c).unwrap_or(0.0);
 
+                let today_template = locale_text(ui_language, LocaleKey::TodayCost);
+                let total30d_template = locale_text(ui_language, LocaleKey::Last30DaysCost);
                 ui.label(
-                    RichText::new(format!("今日：${:.2}", today_cost))
+                    RichText::new(today_template.replace("{:.2}", &format!("{:.2}", today_cost)))
                         .size(FontSize::XS)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new(format!("近 30 天：${:.2}", total_30d))
+                    RichText::new(total30d_template.replace("{:.2}", &format!("{:.2}", total_30d)))
                         .size(FontSize::XS)
                         .color(Theme::TEXT_PRIMARY),
                 );
@@ -2258,41 +2362,54 @@ fn draw_provider_detail_card(
 
             // Vertical action links like macOS
             // Refresh button - first action
-            if draw_menu_item(ui, "↻", "刷新") {
+            if draw_menu_item(ui, "↻", locale_text(ui_language, LocaleKey::ActionRefresh)) {
                 refresh_requested = true;
             }
 
             // Switch Account link - only show for providers that support token accounts
             if TokenAccountSupport::is_supported(
                 ProviderId::from_cli_name(&provider.name).unwrap_or(ProviderId::Claude),
+            ) && draw_menu_item(
+                ui,
+                "->",
+                locale_text(ui_language, LocaleKey::ActionSwitchAccount),
             ) {
-                if draw_menu_item(ui, "->", "切换账号...") {
-                    account_switch_requested = Some(provider.name.clone());
-                }
+                account_switch_requested = Some(provider.name.clone());
             }
 
             // Usage Dashboard link
             if let Some(ref url) = provider.dashboard_url {
                 let dashboard_url = url.clone();
-                if draw_menu_item(ui, "📊", "用量仪表盘") {
+                if draw_menu_item(
+                    ui,
+                    "📊",
+                    locale_text(ui_language, LocaleKey::ActionUsageDashboard),
+                ) {
                     let _ = open::that(&dashboard_url);
                 }
             }
 
             // Status Page link
-            if let Some(status_url) = get_status_page_url(&provider.name) {
-                if draw_menu_item(ui, "⚡", "状态页面") {
-                    let _ = open::that(status_url);
-                }
+            if let Some(status_url) = get_status_page_url(&provider.name)
+                && draw_menu_item(
+                    ui,
+                    "⚡",
+                    locale_text(ui_language, LocaleKey::ActionStatusPage),
+                )
+            {
+                let _ = open::that(status_url);
             }
 
             // Copy Error link
             if let Some(ref error) = provider.error {
                 let error_text = error.clone();
-                if draw_menu_item(ui, "📋", "复制错误") {
-                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                        let _ = clipboard.set_text(&error_text);
-                    }
+                if draw_menu_item(
+                    ui,
+                    "📋",
+                    locale_text(ui_language, LocaleKey::ActionCopyError),
+                ) && let Ok(mut clipboard) = arboard::Clipboard::new()
+                {
+                    let _ = clipboard.set_text(&error_text);
                 }
             }
 
@@ -2319,7 +2436,7 @@ fn draw_horizontal_separator(ui: &mut egui::Ui, left_padding: f32) {
 }
 
 /// Draw a text-only menu item (Settings, About, Quit style)
-fn draw_text_menu_item(ui: &mut egui::Ui, label: &str) -> bool {
+fn draw_text_menu_item(ui: &mut egui::Ui, label: &str, _ui_language: Language) -> bool {
     let available_width = ui.available_width();
 
     let (rect, response) =
@@ -2351,23 +2468,34 @@ fn draw_text_menu_item(ui: &mut egui::Ui, label: &str) -> bool {
     response.clicked()
 }
 
-/// Draw a single metric row - macOS style matching SwiftUI MetricRow
-/// Structure: Title (.body.medium) → Progress bar (with optional pace marker) → X% used | Pace status | Resets in Xh (.footnote)
-///
-/// # Arguments
-/// * `pace_percent` - Optional pace difference (actual - expected). Positive means ahead of expected, negative means behind.
-/// * `pace_lasts_to_reset` - Whether current usage will last until reset (on track or ahead)
-fn draw_metric_row(
-    ui: &mut egui::Ui,
-    title: &str,
+/// Draw a single metric row - macOS style matching SwiftUI MetricRow.
+/// Structure: Title (.body.medium) → Progress bar (with optional pace marker) →
+/// X% used | Pace status | Resets in Xh (.footnote)
+struct MetricRow<'a> {
+    title: &'a str,
     percent: f64,
     show_as_used: bool,
-    reset_text: Option<&str>,
+    reset_text: Option<&'a str>,
     color: Color32,
-    _content_width: f32,
+    /// Difference between actual and expected usage. Positive means ahead of expected, negative means behind.
     pace_percent: Option<f64>,
+    /// Whether current usage will last until reset (on track or ahead).
     pace_lasts_to_reset: bool,
-) {
+    ui_language: Language,
+}
+
+fn draw_metric_row(ui: &mut egui::Ui, metric: MetricRow<'_>) {
+    let MetricRow {
+        title,
+        percent,
+        show_as_used,
+        reset_text,
+        color,
+        pace_percent,
+        pace_lasts_to_reset,
+        ui_language,
+    } = metric;
+
     // Title - .font(.body).fontWeight(.medium)
     ui.label(
         RichText::new(title)
@@ -2420,18 +2548,28 @@ fn draw_metric_row(
     // Info row: X% used (left) | Pace status | Resets in Xh (right) - .font(.footnote)
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(usage_display_label(display_percent, show_as_used))
-                .size(FontSize::XS)
-                .color(Theme::TEXT_PRIMARY),
+            RichText::new(usage_display_label(
+                display_percent,
+                show_as_used,
+                ui_language,
+            ))
+            .size(FontSize::XS)
+            .color(Theme::TEXT_PRIMARY),
         );
 
         // Pace status indicator
         if display_pace_percent.is_some() {
             ui.add_space(8.0);
             let (pace_text, pace_color) = if pace_lasts_to_reset {
-                ("进度正常", Theme::GREEN)
+                (
+                    locale_text(ui_language, LocaleKey::PaceOnTrack),
+                    Theme::GREEN,
+                )
             } else {
-                ("进度滞后", Theme::YELLOW)
+                (
+                    locale_text(ui_language, LocaleKey::PaceBehind),
+                    Theme::YELLOW,
+                )
             };
             ui.label(
                 RichText::new(pace_text)
@@ -2443,9 +2581,13 @@ fn draw_metric_row(
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(reset) = reset_text {
                 ui.label(
-                    RichText::new(format!("重置于 {}", reset))
-                        .size(FontSize::XS)
-                        .color(Theme::TEXT_SECONDARY),
+                    RichText::new(format!(
+                        "{} {}",
+                        locale_text(ui_language, LocaleKey::MetricResetsIn),
+                        reset
+                    ))
+                    .size(FontSize::XS)
+                    .color(Theme::TEXT_SECONDARY),
                 );
             }
         });
@@ -2499,6 +2641,12 @@ fn draw_menu_item(ui: &mut egui::Ui, icon: &str, label: &str) -> bool {
 
 /// Run the application
 pub fn run() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    if is_remote_session() {
+        show_remote_session_error_dialog();
+        anyhow::bail!(remote_session_error_message());
+    }
+
     // Delete any corrupted window state
     if let Some(data_dir) = dirs::data_dir() {
         let state_file = data_dir.join("CodexBar").join("data").join("app.ron");
@@ -2507,19 +2655,7 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([360.0, 500.0])
-            .with_min_inner_size([320.0, 320.0])
-            .with_clamp_size_to_monitor_size(true)
-            .with_resizable(true)
-            .with_decorations(true)
-            .with_transparent(false)
-            .with_always_on_top()
-            .with_title("CodexBar"),
-        persist_window: false, // Don't persist window state
-        ..Default::default()
-    };
+    let options = build_native_options();
 
     eframe::run_native(
         "CodexBar",
@@ -2529,4 +2665,18 @@ pub fn run() -> anyhow::Result<()> {
     .map_err(|e| anyhow::anyhow!("eframe error: {}", e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remote_session_error_message;
+
+    #[test]
+    fn remote_session_error_mentions_cli_and_log() {
+        let message = remote_session_error_message();
+
+        assert!(message.contains("Remote Desktop"));
+        assert!(message.contains("codexbar usage -p claude"));
+        assert!(message.contains("%TEMP%\\codexbar_launch.log"));
+    }
 }

@@ -12,8 +12,8 @@ use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// Command runner configuration
@@ -189,17 +189,17 @@ impl CommandRunner {
         let deadline = start + options.timeout;
 
         // Handle input if provided
-        if let Some(input_text) = input {
-            if let Some(stdin) = child.stdin.take() {
-                use std::io::Write;
-                let mut stdin = stdin;
-                // Wait for initial delay
-                std::thread::sleep(options.initial_delay);
-                // Send input
-                let _ = stdin.write_all(input_text.as_bytes());
-                let _ = stdin.write_all(b"\n");
-                let _ = stdin.flush();
-            }
+        if let Some(input_text) = input
+            && let Some(stdin) = child.stdin.take()
+        {
+            use std::io::Write;
+            let mut stdin = stdin;
+            // Wait for initial delay
+            std::thread::sleep(options.initial_delay);
+            // Send input
+            let _ = stdin.write_all(input_text.as_bytes());
+            let _ = stdin.write_all(b"\n");
+            let _ = stdin.flush();
         }
 
         // Capture output
@@ -281,10 +281,10 @@ impl CommandRunner {
             }
 
             // Check idle timeout
-            if let Some(idle_timeout) = options.idle_timeout {
-                if last_output_time.elapsed() > idle_timeout {
-                    break;
-                }
+            if let Some(idle_timeout) = options.idle_timeout
+                && last_output_time.elapsed() > idle_timeout
+            {
+                break;
             }
         }
 

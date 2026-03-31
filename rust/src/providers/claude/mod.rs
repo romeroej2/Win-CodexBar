@@ -169,6 +169,7 @@ impl ClaudeProvider {
         // Send /usage command
         if let Some(mut stdin) = child.stdin.take() {
             let _ = stdin.write_all(b"/usage\n").await;
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
             let _ = stdin.write_all(b"/exit\n").await;
             drop(stdin);
         }
@@ -207,6 +208,7 @@ impl ClaudeProvider {
     /// Parse Claude CLI /usage output
     fn parse_cli_output(&self, output: &str) -> Result<ProviderFetchResult, ProviderError> {
         let clean = strip_ansi(output);
+        let clean_lower = clean.to_lowercase();
 
         if clean.trim().is_empty() {
             return Err(ProviderError::Parse(
@@ -257,6 +259,16 @@ impl ClaudeProvider {
         // Extract reset times
         let session_reset = extract_reset_description(&clean, "current session");
         let weekly_reset = extract_reset_description(&clean, "current week");
+        let short_form_reset = if clean_lower.contains("out of extra usage") {
+            extract_inline_reset_description(&clean)
+        } else {
+            None
+        };
+        let session_reset = session_reset.or(short_form_reset);
+
+        if session_percent.is_none() && clean_lower.contains("out of extra usage") {
+            session_percent = Some(100.0);
+        }
 
         // Build usage snapshot
         let session_used = session_percent.unwrap_or(0.0);
@@ -359,7 +371,7 @@ fn strip_ansi(text: &str) -> String {
                 }
             // Skip OSC sequences: ESC]...BEL
             } else if chars.peek() == Some(&']') {
-                while let Some(next) = chars.next() {
+                for next in chars.by_ref() {
                     if next == '\x07' || next == '\\' {
                         break;
                     }
@@ -400,9 +412,12 @@ fn parse_percent_line(line: &str) -> Option<f64> {
     // Match patterns like "45% used" or "55% left"
     let re = Regex::new(r"(\d{1,3})\s*%\s*(used|left)").ok()?;
 
-    if let Some(caps) = re.captures(&line.to_lowercase()) {
-        let value: f64 = caps.get(1)?.as_str().parse().ok()?;
-        let kind = caps.get(2)?.as_str();
+    if let Some(caps) = re.captures(&line.to_lowercase())
+        && let Some(value_match) = caps.get(1)
+        && let Some(kind_match) = caps.get(2)
+    {
+        let value: f64 = value_match.as_str().parse().ok()?;
+        let kind = kind_match.as_str();
 
         // Convert to "used" percentage
         if kind == "left" {
@@ -426,16 +441,16 @@ fn extract_all_percents(text: &str) -> Vec<f64> {
     let lower = text.to_lowercase();
 
     for caps in re.captures_iter(&lower) {
-        if let (Some(val_match), Some(kind_match)) = (caps.get(1), caps.get(2)) {
-            if let Ok(val) = val_match.as_str().parse::<f64>() {
-                let kind = kind_match.as_str();
-                let used = if kind == "left" {
-                    (100.0 - val).max(0.0)
-                } else {
-                    val.min(100.0)
-                };
-                results.push(used);
-            }
+        if let (Some(val_match), Some(kind_match)) = (caps.get(1), caps.get(2))
+            && let Ok(val) = val_match.as_str().parse::<f64>()
+        {
+            let kind = kind_match.as_str();
+            let used = if kind == "left" {
+                (100.0 - val).max(0.0)
+            } else {
+                val.min(100.0)
+            };
+            results.push(used);
         }
     }
 
@@ -452,12 +467,11 @@ fn extract_email(text: &str) -> Option<String> {
     ];
 
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if let Some(caps) = re.captures(text) {
-                if let Some(m) = caps.get(1) {
-                    return Some(m.as_str().trim().to_string());
-                }
-            }
+        if let Ok(re) = Regex::new(pattern)
+            && let Some(caps) = re.captures(text)
+            && let Some(m) = caps.get(1)
+        {
+            return Some(m.as_str().trim().to_string());
         }
     }
 
@@ -467,26 +481,24 @@ fn extract_email(text: &str) -> Option<String> {
 /// Extract login method / plan name from text
 fn extract_login_method(text: &str) -> Option<String> {
     // Look for explicit "Login method:" line
-    if let Ok(re) = Regex::new(r"(?i)login\s+method:\s*(.+)") {
-        if let Some(caps) = re.captures(text) {
-            if let Some(m) = caps.get(1) {
-                let method = m.as_str().trim();
-                if !method.is_empty() {
-                    return Some(clean_plan_name(method));
-                }
-            }
+    if let Ok(re) = Regex::new(r"(?i)login\s+method:\s*(.+)")
+        && let Some(caps) = re.captures(text)
+        && let Some(m) = caps.get(1)
+    {
+        let method = m.as_str().trim();
+        if !method.is_empty() {
+            return Some(clean_plan_name(method));
         }
     }
 
     // Look for "Claude <plan>" patterns
-    if let Ok(re) = Regex::new(r"(?i)(claude\s+(?:max|pro|ultra|team|free)[a-z0-9\s._-]*)") {
-        if let Some(caps) = re.captures(text) {
-            if let Some(m) = caps.get(1) {
-                let plan = m.as_str().trim();
-                if !plan.to_lowercase().contains("code") {
-                    return Some(clean_plan_name(plan));
-                }
-            }
+    if let Ok(re) = Regex::new(r"(?i)(claude\s+(?:max|pro|ultra|team|free)[a-z0-9\s._-]*)")
+        && let Some(caps) = re.captures(text)
+        && let Some(m) = caps.get(1)
+    {
+        let plan = m.as_str().trim();
+        if !plan.to_lowercase().contains("code") {
+            return Some(clean_plan_name(plan));
         }
     }
 
@@ -517,6 +529,13 @@ fn extract_reset_description(text: &str, label: &str) -> Option<String> {
     None
 }
 
+/// Extract a "resets ..." suffix from a short single-line status.
+fn extract_inline_reset_description(text: &str) -> Option<String> {
+    let lower = text.to_lowercase();
+    let pos = lower.find("resets")?;
+    Some(text[pos..].trim().to_string())
+}
+
 /// Clean up a plan name by removing ANSI codes and extra whitespace
 fn clean_plan_name(text: &str) -> String {
     let cleaned = strip_ansi(text);
@@ -524,4 +543,62 @@ fn clean_plan_name(text: &str) -> String {
     let re = Regex::new(r"\[\d+m").unwrap_or_else(|_| Regex::new(".^").unwrap());
     let result = re.replace_all(&cleaned, "");
     result.trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_current_cli_usage_screen() {
+        let provider = ClaudeProvider::new();
+        let output = r#"
+Status   Config   Usage
+
+  Current session
+  ██████████████████████████████████████████████████ 100% used
+  Resets 12pm (America/Bogota)
+
+  Current week (all models)
+  ████████████████████████▌                          49% used
+  Resets Apr 3, 2pm (America/Bogota)
+
+  Extra usage
+  ██▍                                                4% used
+  $3.31 / $70.00 spent · Resets Apr 1 (America/Bogota)
+"#;
+
+        let result = provider.parse_cli_output(output).expect("should parse");
+
+        assert_eq!(result.source_label, "cli");
+        assert_eq!(result.usage.primary.used_percent, 100.0);
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("Resets 12pm (America/Bogota)")
+        );
+
+        let weekly = result
+            .usage
+            .secondary
+            .expect("weekly usage should be present");
+        assert_eq!(weekly.used_percent, 49.0);
+        assert_eq!(
+            weekly.reset_description.as_deref(),
+            Some("Resets Apr 3, 2pm (America/Bogota)")
+        );
+    }
+
+    #[test]
+    fn parses_exhausted_short_form_as_full_session_usage() {
+        let provider = ClaudeProvider::new();
+        let output = "You're out of extra usage · resets 12pm (America/Bogota)";
+
+        let result = provider.parse_cli_output(output).expect("should parse");
+
+        assert_eq!(result.usage.primary.used_percent, 100.0);
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("resets 12pm (America/Bogota)")
+        );
+    }
 }

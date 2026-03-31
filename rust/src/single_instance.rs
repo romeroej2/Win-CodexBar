@@ -3,11 +3,11 @@
 //! Prevents multiple instances of the menubar app from running simultaneously.
 
 #[cfg(windows)]
-use windows::core::PCWSTR;
-#[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 #[cfg(windows)]
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
+#[cfg(windows)]
+use windows::core::PCWSTR;
 
 /// Guard that holds the single instance mutex
 /// When dropped, the mutex is released
@@ -21,14 +21,15 @@ pub struct SingleInstanceGuard {
 impl SingleInstanceGuard {
     /// Mutex name for CodexBar — uses Local namespace to restrict to current session,
     /// preventing other users/sessions from blocking startup.
+    #[cfg(windows)]
     const MUTEX_NAME: &'static str = "Local\\CodexBar_SingleInstance_Mutex";
 
     /// Try to acquire the single instance lock
     /// Returns Some(guard) if this is the first instance, None if another instance is running
     #[cfg(windows)]
     pub fn try_acquire() -> Option<Self> {
-        use windows::Win32::Foundation::GetLastError;
         use windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
+        use windows::Win32::Foundation::GetLastError;
 
         // Convert mutex name to wide string
         let wide_name: Vec<u16> = Self::MUTEX_NAME

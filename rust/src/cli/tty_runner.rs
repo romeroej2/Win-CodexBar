@@ -163,15 +163,15 @@ impl TtyCommandRunner {
     /// Locate a binary using the system PATH
     pub fn which(tool: &str) -> Option<PathBuf> {
         // Check for specific tool overrides
-        if tool == "codex" {
-            if let Some(path) = Self::locate_codex_binary() {
-                return Some(path);
-            }
+        if tool == "codex"
+            && let Some(path) = Self::locate_codex_binary()
+        {
+            return Some(path);
         }
-        if tool == "claude" {
-            if let Some(path) = Self::locate_claude_binary() {
-                return Some(path);
-            }
+        if tool == "claude"
+            && let Some(path) = Self::locate_claude_binary()
+        {
+            return Some(path);
         }
 
         // Use `where` on Windows (equivalent to `which` on Unix)
@@ -344,11 +344,11 @@ impl TtyCommandRunner {
 
         // Send the script if provided
         let trimmed = script.trim();
-        if !trimmed.is_empty() {
-            if let Some(ref mut stdin) = stdin {
-                let _ = writeln!(stdin, "{}", trimmed);
-                let _ = stdin.flush();
-            }
+        if !trimmed.is_empty()
+            && let Some(ref mut stdin) = stdin
+        {
+            let _ = writeln!(stdin, "{}", trimmed);
+            let _ = stdin.flush();
         }
 
         // Set up non-blocking readers using channels
@@ -400,11 +400,12 @@ impl TtyCommandRunner {
             }
 
             // Check idle timeout
-            if let Some(idle) = idle_timeout {
-                if !buffer.is_empty() && last_output_time.elapsed() > idle {
-                    stopped_early = true;
-                    break;
-                }
+            if let Some(idle) = idle_timeout
+                && !buffer.is_empty()
+                && last_output_time.elapsed() > idle
+            {
+                stopped_early = true;
+                break;
             }
 
             // Check if process has exited
@@ -470,14 +471,14 @@ impl TtyCommandRunner {
             }
 
             // Send periodic enters if configured
-            if let Some(interval) = options.send_enter_every_secs {
-                if last_enter.elapsed() >= Duration::from_secs_f64(interval) {
-                    if let Some(ref mut stdin) = stdin {
-                        let _ = writeln!(stdin);
-                        let _ = stdin.flush();
-                    }
-                    last_enter = Instant::now();
+            if let Some(interval) = options.send_enter_every_secs
+                && last_enter.elapsed() >= Duration::from_secs_f64(interval)
+            {
+                if let Some(ref mut stdin) = stdin {
+                    let _ = writeln!(stdin);
+                    let _ = stdin.flush();
                 }
+                last_enter = Instant::now();
             }
 
             // Small sleep to avoid busy loop
@@ -653,7 +654,7 @@ mod tests {
     fn test_enriched_path() {
         let path = TtyCommandRunner::enriched_path();
         assert!(!path.is_empty());
-        // Should contain path separator
-        assert!(path.contains(';') || path.len() > 0);
+        // Should contain path separator or at least a non-empty path string.
+        assert!(path.contains(';') || !path.is_empty());
     }
 }

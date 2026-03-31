@@ -1,7 +1,7 @@
 //! Claude Web API fetcher - uses browser cookies to fetch usage from claude.ai
 
 use chrono::{DateTime, Utc};
-use reqwest::{header, Client};
+use reqwest::{Client, header};
 use serde::Deserialize;
 
 use crate::browser::cookies::get_cookie_header;
@@ -170,24 +170,24 @@ impl ClaudeWebApiFetcher {
         let mut result = ProviderFetchResult::new(snapshot, "web");
 
         // Add cost info if available
-        if let Some(extra) = extra_usage {
-            if extra.is_enabled.unwrap_or(false) {
-                let used_cents = extra.used_credits.unwrap_or(0.0);
-                let limit_cents = extra.monthly_credit_limit;
-                let currency = extra.currency.unwrap_or_else(|| "USD".to_string());
+        if let Some(extra) = extra_usage
+            && extra.is_enabled.unwrap_or(false)
+        {
+            let used_cents = extra.used_credits.unwrap_or(0.0);
+            let limit_cents = extra.monthly_credit_limit;
+            let currency = extra.currency.unwrap_or_else(|| "USD".to_string());
 
-                let mut cost = CostSnapshot::new(
-                    used_cents / 100.0, // Convert cents to dollars
-                    currency,
-                    "Monthly",
-                );
+            let mut cost = CostSnapshot::new(
+                used_cents / 100.0, // Convert cents to dollars
+                currency,
+                "Monthly",
+            );
 
-                if let Some(limit) = limit_cents {
-                    cost = cost.with_limit(limit / 100.0);
-                }
-
-                result = result.with_cost(cost);
+            if let Some(limit) = limit_cents {
+                cost = cost.with_limit(limit / 100.0);
             }
+
+            result = result.with_cost(cost);
         }
 
         Ok(result)
@@ -315,14 +315,14 @@ impl ClaudeWebApiFetcher {
 
     /// Convert a usage window to a RateWindow
     fn to_rate_window(&self, window: &UsageWindow, window_minutes: Option<u32>) -> RateWindow {
-        let used_percent = window.utilization.unwrap_or(0.0);
+        let used_percent = normalize_utilization(window.utilization.unwrap_or(0.0));
 
         let resets_at = window
             .resets_at
             .as_ref()
             .and_then(|s| Self::parse_iso8601(s));
 
-        let reset_description = resets_at.map(|dt| Self::format_reset_time(dt));
+        let reset_description = resets_at.map(Self::format_reset_time);
 
         RateWindow::with_details(used_percent, window_minutes, resets_at, reset_description)
     }
@@ -360,5 +360,42 @@ impl ClaudeWebApiFetcher {
 impl Default for ClaudeWebApiFetcher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn normalize_utilization(utilization: f64) -> f64 {
+    if utilization > 0.0 && utilization <= 1.0 {
+        utilization * 100.0
+    } else {
+        utilization
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ClaudeWebApiFetcher, UsageWindow};
+
+    #[test]
+    fn converts_fractional_utilization_to_percent() {
+        let window = UsageWindow {
+            utilization: Some(0.23),
+            resets_at: None,
+        };
+
+        let rate = ClaudeWebApiFetcher::new().to_rate_window(&window, Some(300));
+
+        assert!((rate.used_percent - 23.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preserves_existing_percentage_utilization() {
+        let window = UsageWindow {
+            utilization: Some(23.0),
+            resets_at: None,
+        };
+
+        let rate = ClaudeWebApiFetcher::new().to_rate_window(&window, Some(300));
+
+        assert!((rate.used_percent - 23.0).abs() < f64::EPSILON);
     }
 }

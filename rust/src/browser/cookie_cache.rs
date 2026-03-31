@@ -67,8 +67,7 @@ impl CookieHeaderCache {
         }
 
         let entry = CookieHeaderEntry::new(normalized, source_label);
-        let path =
-            Self::cache_path(provider).ok_or_else(|| CookieHeaderCacheError::PathNotAvailable)?;
+        let path = Self::cache_path(provider).ok_or(CookieHeaderCacheError::PathNotAvailable)?;
 
         // Create parent directory
         if let Some(parent) = path.parent() {
@@ -89,16 +88,15 @@ impl CookieHeaderCache {
 
     /// Clear cached cookie header for a provider
     pub fn clear(provider: ProviderId) {
-        if let Some(path) = Self::cache_path(provider) {
-            if let Err(e) = fs::remove_file(&path) {
-                if e.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
-                        provider = %provider.cli_name(),
-                        error = %e,
-                        "Failed to remove cookie cache"
-                    );
-                }
-            }
+        if let Some(path) = Self::cache_path(provider)
+            && let Err(e) = fs::remove_file(&path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(
+                provider = %provider.cli_name(),
+                error = %e,
+                "Failed to remove cookie cache"
+            );
         }
     }
 

@@ -72,11 +72,12 @@ impl CopilotApi {
 
     fn load_token(&self, api_key: Option<&str>) -> Result<String, ProviderError> {
         // Check api_key first (from settings/ctx)
-        if let Some(key) = api_key {
-            if !key.is_empty() && key.chars().all(|c| c.is_ascii_graphic()) {
-                tracing::debug!("Using Copilot token from settings");
-                return Ok(key.to_string());
-            }
+        if let Some(key) = api_key
+            && !key.is_empty()
+            && key.chars().all(|c| c.is_ascii_graphic())
+        {
+            tracing::debug!("Using Copilot token from settings");
+            return Ok(key.to_string());
         }
 
         // Try each credential target as fallback
@@ -110,10 +111,10 @@ impl CopilotApi {
     fn try_load_credential(&self, target: &str) -> Option<String> {
         use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
-        use windows::core::PCWSTR;
         use windows::Win32::Security::Credentials::{
-            CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
+            CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW,
         };
+        use windows::core::PCWSTR;
 
         let target_wide: Vec<u16> = OsStr::new(target)
             .encode_wide()

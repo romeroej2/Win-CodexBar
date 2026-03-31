@@ -14,6 +14,32 @@ use std::path::PathBuf;
 
 use crate::core::ProviderId;
 
+/// UI language for the application
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    /// English (default)
+    #[default]
+    English,
+    /// Chinese (Simplified)
+    Chinese,
+}
+
+impl Language {
+    /// Get the display name for this language
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Language::English => "English",
+            Language::Chinese => "中文",
+        }
+    }
+
+    /// Get all available languages
+    pub fn all() -> &'static [Language] {
+        &[Language::English, Language::Chinese]
+    }
+}
+
 /// Update channel for receiving updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -198,6 +224,10 @@ pub struct Settings {
     /// Install pending updates when quitting the application
     #[serde(default)]
     pub install_updates_on_quit: bool,
+
+    /// UI language for the application (English default for backward compatibility)
+    #[serde(default)]
+    pub ui_language: Language,
 }
 
 fn default_true() -> bool {
@@ -239,6 +269,7 @@ impl Default for Settings {
             global_shortcut: default_global_shortcut(), // Ctrl+Shift+U by default
             auto_download_updates: true, // Auto-download updates by default
             install_updates_on_quit: false, // Don't auto-install on quit by default
+            ui_language: Language::default(), // English by default
         }
     }
 }
@@ -251,22 +282,13 @@ impl Settings {
 
     /// Load settings from disk
     pub fn load() -> Self {
-        let mut settings = if let Some(path) = Self::settings_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(s) = serde_json::from_str(&content) {
-                        s
-                    } else {
-                        Self::default()
-                    }
-                } else {
-                    Self::default()
-                }
-            } else {
-                Self::default()
-            }
-        } else {
-            Self::default()
+        #[allow(unused_mut)]
+        let mut settings = match Self::settings_path() {
+            Some(path) if path.exists() => match std::fs::read_to_string(&path) {
+                Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+                Err(_) => Self::default(),
+            },
+            _ => Self::default(),
         };
 
         // Sync autostart toggle with actual registry state
@@ -300,8 +322,8 @@ impl Settings {
 
         #[cfg(target_os = "windows")]
         {
-            use winreg::enums::*;
             use winreg::RegKey;
+            use winreg::enums::*;
 
             let hkcu = RegKey::predef(HKEY_CURRENT_USER);
             let run_key = hkcu.open_subkey_with_flags(
@@ -328,8 +350,8 @@ impl Settings {
     /// Check if start at login is actually enabled in registry
     #[cfg(target_os = "windows")]
     pub fn is_start_at_login_enabled() -> bool {
-        use winreg::enums::*;
         use winreg::RegKey;
+        use winreg::enums::*;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         if let Ok(run_key) = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run") {
@@ -474,14 +496,11 @@ impl ManualCookies {
 
     /// Load manual cookies from disk
     pub fn load() -> Self {
-        if let Some(path) = Self::cookies_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(cookies) = serde_json::from_str(&content) {
-                        return cookies;
-                    }
-                }
-            }
+        if let Some(path) = Self::cookies_path()
+            && path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            return serde_json::from_str(&content).unwrap_or_default();
         }
         Self::default()
     }
@@ -577,14 +596,11 @@ impl ApiKeys {
 
     /// Load API keys from disk
     pub fn load() -> Self {
-        if let Some(path) = Self::keys_path() {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(keys) = serde_json::from_str(&content) {
-                        return keys;
-                    }
-                }
-            }
+        if let Some(path) = Self::keys_path()
+            && path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            return serde_json::from_str(&content).unwrap_or_default();
         }
         Self::default()
     }
@@ -735,7 +751,9 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             name: "Warp",
             requires_api_key: true,
             api_key_env_var: Some("WARP_API_KEY"),
-            api_key_help: Some("Get your API key from Warp → Settings → API Keys (docs.warp.dev/reference/cli/api-keys)"),
+            api_key_help: Some(
+                "Get your API key from Warp → Settings → API Keys (docs.warp.dev/reference/cli/api-keys)",
+            ),
             config_file_path: None,
             dashboard_url: Some("https://docs.warp.dev/reference/cli/api-keys"),
         },
@@ -839,5 +857,91 @@ mod tests {
         // Remove it
         cookies.remove("claude");
         assert_eq!(cookies.get("claude"), None);
+    }
+
+    #[test]
+    fn test_language_defaults_to_english() {
+        let settings = Settings::default();
+        assert_eq!(settings.ui_language, Language::English);
+    }
+
+    #[test]
+    fn test_language_all_variants_available() {
+        let languages = Language::all();
+        assert_eq!(languages.len(), 2);
+        assert!(languages.contains(&Language::English));
+        assert!(languages.contains(&Language::Chinese));
+    }
+
+    #[test]
+    fn test_language_display_names() {
+        assert_eq!(Language::English.display_name(), "English");
+        assert_eq!(Language::Chinese.display_name(), "中文");
+    }
+
+    #[test]
+    fn test_settings_load_missing_language_field_defaults_to_english() {
+        // Simulate loading legacy settings JSON without ui_language field
+        let legacy_json = r#"{
+            "enabled_providers": ["claude", "codex"],
+            "refresh_interval_secs": 300,
+            "start_minimized": false,
+            "ui_language": "english"
+        }"#;
+
+        let settings: Result<Settings, _> = serde_json::from_str(legacy_json);
+        assert!(settings.is_ok());
+        let settings = settings.unwrap();
+        assert_eq!(settings.ui_language, Language::English);
+    }
+
+    #[test]
+    fn test_settings_roundtrip_with_language() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create settings with Chinese language
+        let settings = Settings {
+            ui_language: Language::Chinese,
+            ..Settings::default()
+        };
+
+        // Save to a temp file
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let json = serde_json::to_string_pretty(&settings).expect("Failed to serialize settings");
+        temp_file
+            .write_all(json.as_bytes())
+            .expect("Failed to write settings");
+        let path = temp_file.path().to_path_buf();
+
+        // Read back and verify
+        let content = std::fs::read_to_string(&path).expect("Failed to read settings");
+        let loaded: Settings =
+            serde_json::from_str(&content).expect("Failed to deserialize settings");
+
+        assert_eq!(loaded.ui_language, Language::Chinese);
+    }
+
+    #[test]
+    fn test_language_serde_serialization() {
+        // Test that Language serializes to lowercase string
+        let english = Language::English;
+        let chinese = Language::Chinese;
+
+        let english_json = serde_json::to_string(&english).unwrap();
+        let chinese_json = serde_json::to_string(&chinese).unwrap();
+
+        assert_eq!(english_json, "\"english\"");
+        assert_eq!(chinese_json, "\"chinese\"");
+    }
+
+    #[test]
+    fn test_language_serde_deserialization() {
+        // Test that lowercase strings deserialize correctly
+        let english: Language = serde_json::from_str("\"english\"").unwrap();
+        let chinese: Language = serde_json::from_str("\"chinese\"").unwrap();
+
+        assert_eq!(english, Language::English);
+        assert_eq!(chinese, Language::Chinese);
     }
 }

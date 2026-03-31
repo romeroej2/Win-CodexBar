@@ -169,14 +169,14 @@ where
             output.push('\n');
 
             // Check for URL (indicates browser login)
-            if auth_link.is_none() {
-                if let Some(m) = url_regex.find(&line) {
-                    auth_link = Some(m.as_str().to_string());
-                    on_phase(LoginPhase::WaitingBrowser);
+            if auth_link.is_none()
+                && let Some(m) = url_regex.find(&line)
+            {
+                auth_link = Some(m.as_str().to_string());
+                on_phase(LoginPhase::WaitingBrowser);
 
-                    // Open the URL in browser
-                    let _ = open::that(m.as_str());
-                }
+                // Open the URL in browser
+                let _ = open::that(m.as_str());
             }
 
             // Check for success markers
@@ -211,12 +211,12 @@ where
             output.push_str(&line);
             output.push('\n');
 
-            if auth_link.is_none() {
-                if let Some(m) = url_regex.find(&line) {
-                    auth_link = Some(m.as_str().to_string());
-                    on_phase(LoginPhase::WaitingBrowser);
-                    let _ = open::that(m.as_str());
-                }
+            if auth_link.is_none()
+                && let Some(m) = url_regex.find(&line)
+            {
+                auth_link = Some(m.as_str().to_string());
+                on_phase(LoginPhase::WaitingBrowser);
+                let _ = open::that(m.as_str());
             }
 
             for marker in success_markers {
