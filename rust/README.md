@@ -70,7 +70,6 @@ This launches the system tray application:
 - Use the Providers tab to re-enable providers and review auth/account state
 - Use the Cookies, API Keys, or provider account sections to recover credentials if status stops updating
 - Use the About button for version info
-- On Windows, the GUI prefers the `wgpu` renderer so it can still start in RDP and VM sessions where OpenGL is unavailable
 
 ### CLI Mode
 
