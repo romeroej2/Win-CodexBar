@@ -52,6 +52,46 @@ jobs:
         shell: bash
         run: cargo test --manifest-path rust/Cargo.toml --target x86_64-pc-windows-msvc
 
+      - name: Build release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build \
+            --manifest-path rust/Cargo.toml \
+            --release \
+            --target x86_64-pc-windows-msvc \
+            --bin codexbar
+
+      - name: Smoke test Windows CLI
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "rust\target\x86_64-pc-windows-msvc\release\codexbar.exe"
+          $version = & $exe --version
+          if (-not $version) {
+            throw "codexbar.exe --version returned no output"
+          }
+          Write-Host $version
+
+      - name: Smoke test Windows menubar launch
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "rust\target\x86_64-pc-windows-msvc\release\codexbar.exe"
+          $proc = Start-Process -FilePath $exe -ArgumentList "menubar" -WindowStyle Hidden -PassThru
+          Start-Sleep -Seconds 8
+
+          try {
+            $running = Get-Process -Id $proc.Id -ErrorAction Stop
+          } catch {
+            throw "codexbar menubar exited before the smoke check completed"
+          }
+
+          if ($running.HasExited) {
+            throw "codexbar menubar exited before the smoke check completed"
+          }
+
+          Stop-Process -Id $proc.Id -Force
+          Wait-Process -Id $proc.Id -Timeout 15 -ErrorAction SilentlyContinue
+
   linux-cli-smoke:
     strategy:
       fail-fast: false
