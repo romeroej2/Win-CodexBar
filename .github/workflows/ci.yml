@@ -66,16 +66,40 @@ jobs:
         shell: pwsh
         run: |
           $exe = Resolve-Path "rust\target\x86_64-pc-windows-msvc\release\codexbar.exe"
-          $version = & $exe --version
-          if (-not $version) {
-            throw "codexbar.exe --version returned no output"
+          $log = Join-Path $env:TEMP "codexbar_launch.log"
+          Remove-Item $log -Force -ErrorAction SilentlyContinue
+
+          $proc = Start-Process -FilePath $exe -ArgumentList "--version" -WindowStyle Hidden -PassThru
+          $proc.WaitForExit()
+          $proc.Refresh()
+
+          if ($proc.ExitCode -ne 0) {
+            if (Test-Path $log) {
+              Write-Host (Get-Content $log -Raw)
+            }
+            throw "codexbar.exe --version exited with code $($proc.ExitCode)"
           }
-          Write-Host $version
+
+          if (-not (Test-Path $log)) {
+            throw "codexbar.exe --version did not create the expected launch log"
+          }
+
+          $logContent = Get-Content $log -Raw
+          if ($logContent -notmatch '--version') {
+            throw "codexbar.exe --version launch log did not record the CLI arguments"
+          }
+          if ($logContent -notmatch 'Exiting with code: 0') {
+            throw "codexbar.exe --version launch log did not record a successful exit"
+          }
+
+          Write-Host $logContent
 
       - name: Smoke test Windows menubar launch
         shell: pwsh
         run: |
           $exe = Resolve-Path "rust\target\x86_64-pc-windows-msvc\release\codexbar.exe"
+          $log = Join-Path $env:TEMP "codexbar_launch.log"
+          Remove-Item $log -Force -ErrorAction SilentlyContinue
           $proc = Start-Process -FilePath $exe -ArgumentList "menubar" -WindowStyle Hidden -PassThru
           Start-Sleep -Seconds 8
 
@@ -88,6 +112,17 @@ jobs:
           if ($running.HasExited) {
             throw "codexbar menubar exited before the smoke check completed"
           }
+
+          if (-not (Test-Path $log)) {
+            throw "codexbar menubar did not create the expected launch log"
+          }
+
+          $logContent = Get-Content $log -Raw
+          if ($logContent -notmatch 'menubar') {
+            throw "codexbar menubar launch log did not record the command"
+          }
+
+          Write-Host $logContent
 
           Stop-Process -Id $proc.Id -Force
           Wait-Process -Id $proc.Id -Timeout 15 -ErrorAction SilentlyContinue
