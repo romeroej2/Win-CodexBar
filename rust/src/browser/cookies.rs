@@ -250,7 +250,7 @@ impl CookieExtractor {
             };
 
             let result =
-                CryptUnprotectData(&mut input_blob, None, None, None, None, 0, &mut output_blob);
+                CryptUnprotectData(&input_blob, None, None, None, None, 0, &mut output_blob);
 
             if result.is_err() {
                 return Err(CookieError::Dpapi(format!(

@@ -42,15 +42,15 @@ fn restore_main_window() {
     use windows::core::w;
 
     unsafe {
-        if let Ok(hwnd) = FindWindowW(None, w!("CodexBar")) {
-            if !hwnd.is_invalid() {
-                if IsIconic(hwnd).as_bool() {
-                    let _ = ShowWindow(hwnd, SW_RESTORE);
-                } else {
-                    let _ = ShowWindow(hwnd, SW_SHOW);
-                }
-                let _ = SetForegroundWindow(hwnd);
+        if let Ok(hwnd) = FindWindowW(None, w!("CodexBar"))
+            && !hwnd.is_invalid()
+        {
+            if IsIconic(hwnd).as_bool() {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+            } else {
+                let _ = ShowWindow(hwnd, SW_SHOW);
             }
+            let _ = SetForegroundWindow(hwnd);
         }
     }
 }
@@ -61,10 +61,10 @@ fn show_main_window_no_focus() {
     use windows::core::w;
 
     unsafe {
-        if let Ok(hwnd) = FindWindowW(None, w!("CodexBar")) {
-            if !hwnd.is_invalid() {
-                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            }
+        if let Ok(hwnd) = FindWindowW(None, w!("CodexBar"))
+            && !hwnd.is_invalid()
+        {
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
     }
 }
