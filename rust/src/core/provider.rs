@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 22);
+        assert_eq!(all.len(), 23);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Kimi));
@@ -427,6 +427,7 @@ mod tests {
         assert!(all.contains(&ProviderId::Amp));
         assert!(all.contains(&ProviderId::Synthetic));
         assert!(all.contains(&ProviderId::JetBrains));
+        assert!(all.contains(&ProviderId::NanoGPT));
     }
 
     #[test]

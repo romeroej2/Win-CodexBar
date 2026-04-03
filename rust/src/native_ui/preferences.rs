@@ -952,7 +952,7 @@ impl PreferencesWindow {
                 "cursor" => "每月请求上限",
                 "openai" => "Token 用量与额度",
                 "gemini" => "每分钟请求数",
-                "nanogpt" => "Token 用量与上限",
+                "nanogpt" => "订阅用量单位与上限",
                 _ => "用量追踪",
             };
             self.draw_info_row(ui, locale_text(lang, LocaleKey::TrackingItem), rate_info);

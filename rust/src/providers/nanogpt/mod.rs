@@ -24,11 +24,10 @@ const NANOGPT_CREDENTIAL_TARGET: &str = "codexbar-nanogpt";
 struct UsageResponse {
     active: bool,
     limits: UsageLimits,
-    allow_overage: bool,
+    enforce_daily_limit: bool,
     period: BillingPeriod,
-    daily_input_tokens: UsageMetric,
-    weekly_input_tokens: UsageMetric,
-    daily_images: Option<UsageMetric>,
+    daily: UsageMetric,
+    monthly: UsageMetric,
     state: String,
     grace_until: Option<String>,
 }
@@ -36,9 +35,8 @@ struct UsageResponse {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UsageLimits {
-    weekly_input_tokens: f64,
-    daily_input_tokens: f64,
-    daily_images: Option<f64>,
+    daily: f64,
+    monthly: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,7 +61,7 @@ impl NanoGPTProvider {
                 id: ProviderId::NanoGPT,
                 display_name: "NanoGPT",
                 session_label: "Daily",
-                weekly_label: "Weekly",
+                weekly_label: "Monthly",
                 supports_opus: false,
                 supports_credits: false,
                 default_enabled: false,
@@ -104,6 +102,47 @@ impl NanoGPTProvider {
         DateTime::from_timestamp_millis(ms)
     }
 
+    fn usage_snapshot_from_response(usage: UsageResponse) -> Result<UsageSnapshot, ProviderError> {
+        if !usage.active {
+            return Err(ProviderError::AuthRequired);
+        }
+
+        // NanoGPT documents these as usage units, not tokens or dollars.
+        let daily_percent = (usage.daily.percent_used * 100.0).clamp(0.0, 100.0);
+        let mut daily_window = RateWindow::new(daily_percent);
+        if let Some(reset_at) = Self::ms_to_datetime(usage.daily.reset_at) {
+            daily_window.resets_at = Some(reset_at);
+        }
+        daily_window.reset_description = Some(format!(
+            "{:.0}/{:.0} units",
+            usage.daily.used, usage.limits.daily
+        ));
+
+        let monthly_percent = (usage.monthly.percent_used * 100.0).clamp(0.0, 100.0);
+        let mut monthly_window = RateWindow::new(monthly_percent);
+        if let Some(reset_at) = Self::ms_to_datetime(usage.monthly.reset_at) {
+            monthly_window.resets_at = Some(reset_at);
+        }
+        monthly_window.reset_description = Some(format!(
+            "{:.0}/{:.0} units",
+            usage.monthly.used, usage.limits.monthly
+        ));
+
+        let period_note = if let Some(grace_until) = usage.grace_until.as_deref() {
+            format!("{} until {}", usage.state, grace_until)
+        } else if !usage.period.current_period_end.is_empty() {
+            format!("{} until {}", usage.state, usage.period.current_period_end)
+        } else if usage.enforce_daily_limit {
+            format!("{:.0} monthly units", usage.limits.monthly)
+        } else {
+            usage.state
+        };
+
+        Ok(UsageSnapshot::new(daily_window)
+            .with_secondary(monthly_window)
+            .with_login_method(period_note))
+    }
+
     /// Fetch usage from NanoGPT API
     async fn fetch_usage_api(&self, ctx: &FetchContext) -> Result<UsageSnapshot, ProviderError> {
         let api_key = Self::get_api_token(ctx.api_key.as_deref())?;
@@ -139,40 +178,7 @@ impl NanoGPTProvider {
         let usage: UsageResponse = serde_json::from_str(&response_text)
             .map_err(|e| ProviderError::Parse(format!("Failed to parse usage response: {}", e)))?;
 
-        if !usage.active {
-            return Err(ProviderError::AuthRequired);
-        }
-
-        // Daily input tokens (primary)
-        let daily_percent = (usage.daily_input_tokens.percent_used * 100.0).clamp(0.0, 100.0);
-        let mut daily_window = RateWindow::new(daily_percent);
-        if let Some(reset_at) = Self::ms_to_datetime(usage.daily_input_tokens.reset_at) {
-            daily_window.resets_at = Some(reset_at);
-        }
-        daily_window.reset_description = Some(format!(
-            "{:.0}/{:.0} tokens",
-            usage.daily_input_tokens.used, usage.limits.daily_input_tokens
-        ));
-
-        // Weekly input tokens (secondary)
-        let weekly_percent = (usage.weekly_input_tokens.percent_used * 100.0).clamp(0.0, 100.0);
-        let mut weekly_window = RateWindow::new(weekly_percent);
-        if let Some(reset_at) = Self::ms_to_datetime(usage.weekly_input_tokens.reset_at) {
-            weekly_window.resets_at = Some(reset_at);
-        }
-        weekly_window.reset_description = Some(format!(
-            "{:.0}/{:.0} tokens",
-            usage.weekly_input_tokens.used, usage.limits.weekly_input_tokens
-        ));
-
-        let snapshot = UsageSnapshot::new(daily_window)
-            .with_secondary(weekly_window)
-            .with_login_method(format!(
-                "{:.0} weekly limit",
-                usage.limits.weekly_input_tokens
-            ));
-
-        Ok(snapshot)
+        Self::usage_snapshot_from_response(usage)
     }
 }
 
@@ -221,5 +227,94 @@ impl Provider for NanoGPTProvider {
 
     fn supports_cli(&self) -> bool {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_documented_daily_and_monthly_usage() {
+        let response: UsageResponse = serde_json::from_value(serde_json::json!({
+            "active": true,
+            "limits": {
+                "daily": 5000.0,
+                "monthly": 60000.0
+            },
+            "enforceDailyLimit": true,
+            "daily": {
+                "used": 125.0,
+                "remaining": 4875.0,
+                "percentUsed": 0.025,
+                "resetAt": 1738540800000_i64
+            },
+            "monthly": {
+                "used": 3000.0,
+                "remaining": 57000.0,
+                "percentUsed": 0.05,
+                "resetAt": 1739404800000_i64
+            },
+            "period": {
+                "currentPeriodEnd": "2025-02-13T23:59:59.000Z"
+            },
+            "state": "active",
+            "graceUntil": null
+        }))
+        .expect("documented response should deserialize");
+
+        let usage = NanoGPTProvider::usage_snapshot_from_response(response)
+            .expect("documented response should parse");
+
+        assert!((usage.primary.used_percent - 2.5).abs() < 0.0001);
+        assert_eq!(
+            usage.primary.reset_description.as_deref(),
+            Some("125/5000 units")
+        );
+
+        let secondary = usage.secondary.expect("monthly usage should be present");
+        assert!((secondary.used_percent - 5.0).abs() < 0.0001);
+        assert_eq!(
+            secondary.reset_description.as_deref(),
+            Some("3000/60000 units")
+        );
+        assert_eq!(
+            usage.login_method.as_deref(),
+            Some("active until 2025-02-13T23:59:59.000Z")
+        );
+    }
+
+    #[test]
+    fn inactive_subscription_requires_auth() {
+        let response: UsageResponse = serde_json::from_value(serde_json::json!({
+            "active": false,
+            "limits": {
+                "daily": 5000.0,
+                "monthly": 60000.0
+            },
+            "enforceDailyLimit": true,
+            "daily": {
+                "used": 0.0,
+                "remaining": 5000.0,
+                "percentUsed": 0.0,
+                "resetAt": 1738540800000_i64
+            },
+            "monthly": {
+                "used": 0.0,
+                "remaining": 60000.0,
+                "percentUsed": 0.0,
+                "resetAt": 1739404800000_i64
+            },
+            "period": {
+                "currentPeriodEnd": "2025-02-13T23:59:59.000Z"
+            },
+            "state": "inactive",
+            "graceUntil": null
+        }))
+        .expect("inactive response should deserialize");
+
+        let err = NanoGPTProvider::usage_snapshot_from_response(response)
+            .expect_err("inactive subscription should require auth");
+        assert!(matches!(err, ProviderError::AuthRequired));
     }
 }
