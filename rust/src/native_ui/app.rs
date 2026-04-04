@@ -25,6 +25,7 @@ use crate::core::{TokenAccountStore, TokenAccountSupport};
 use crate::cost_scanner::get_daily_cost_history;
 use crate::locale::{LocaleKey, get_text as locale_text};
 use crate::login::LoginPhase;
+use crate::notifications::NotificationManager;
 use crate::providers::*;
 use crate::settings::{ApiKeys, Language, ManualCookies, Settings, UpdateChannel};
 use crate::shortcuts::{ShortcutManager, parse_shortcut};
@@ -126,6 +127,8 @@ pub struct ProviderData {
     pub session_reset: Option<String>,
     pub weekly_percent: Option<f64>,
     pub weekly_reset: Option<String>,
+    pub monthly_percent: Option<f64>, // Tertiary (30-day) usage for Infini
+    pub monthly_reset: Option<String>,
     pub model_percent: Option<f64>,
     pub model_name: Option<String>,
     pub plan: Option<String>,
@@ -153,6 +156,8 @@ impl ProviderData {
             session_reset: None,
             weekly_percent: None,
             weekly_reset: None,
+            monthly_percent: None,
+            monthly_reset: None,
             model_percent: None,
             model_name: None,
             plan: None,
@@ -213,6 +218,11 @@ impl ProviderData {
                 s.resets_at
                     .map(|t| format_reset_time(t, reset_time_relative, ui_language))
             }),
+            monthly_percent: snapshot.tertiary.as_ref().map(|t| t.used_percent),
+            monthly_reset: snapshot.tertiary.as_ref().and_then(|t| {
+                t.resets_at
+                    .map(|r| format_reset_time(r, reset_time_relative, ui_language))
+            }),
             model_percent: snapshot.model_specific.as_ref().map(|m| m.used_percent),
             model_name: snapshot
                 .model_specific
@@ -243,6 +253,8 @@ impl ProviderData {
             session_reset: None,
             weekly_percent: None,
             weekly_reset: None,
+            monthly_percent: None,
+            monthly_reset: None,
             model_percent: None,
             model_name: None,
             plan: None,
@@ -325,6 +337,7 @@ fn provider_metric_labels(provider_name: &str) -> (String, String) {
 fn should_show_provider(provider: &ProviderData) -> bool {
     provider.session_percent.is_some()
         || provider.weekly_percent.is_some()
+        || provider.monthly_percent.is_some()
         || provider.model_percent.is_some()
         || provider.error.is_some()
 }
@@ -668,6 +681,7 @@ pub struct CodexBarApp {
     was_refreshing: bool, // Track previous frame's refresh state
     pending_main_window_layout: bool,
     anchor_main_window_to_pointer: bool,
+    notification_manager: Arc<Mutex<NotificationManager>>,
     #[cfg(debug_assertions)]
     test_input_queue: super::test_server::TestInputQueue,
 }
@@ -865,6 +879,7 @@ impl CodexBarApp {
             was_refreshing: false,
             pending_main_window_layout: true,
             anchor_main_window_to_pointer: false,
+            notification_manager: Arc::new(Mutex::new(NotificationManager::new())),
             #[cfg(debug_assertions)]
             test_input_queue,
         }
@@ -972,6 +987,9 @@ impl CodexBarApp {
         let ui_language = self.settings.ui_language;
         // Load token accounts for account switching support
         let token_accounts = TokenAccountStore::new().load().unwrap_or_default();
+        // Notification manager for usage alerts
+        let notification_manager = Arc::clone(&self.notification_manager);
+        let settings = self.settings.clone();
 
         std::thread::spawn(move || {
             if let Ok(mut s) = state.lock() {
@@ -1144,6 +1162,21 @@ impl CodexBarApp {
                 s.summary_providers = s.providers.clone();
                 s.last_refresh = Instant::now();
                 s.is_refreshing = false;
+                
+                // Check for usage alerts and send notifications
+                for provider in &s.providers {
+                    if let Some(provider_id) = ProviderId::from_cli_name(&provider.name) {
+                        // Check primary session usage
+                        if let Some(session_percent) = provider.session_percent {
+                            if let Ok(mut nm) = notification_manager.lock() {
+                                nm.check_and_notify(provider_id, session_percent, &settings);
+                                nm.check_session_transition(provider_id, session_percent, &settings);
+                            }
+                        }
+                        // Note: Infini alerts are based on the highest usage across all windows
+                        // The primary (5-hour) window is used as the main indicator
+                    }
+                }
             }
         });
     }
@@ -1232,6 +1265,7 @@ fn create_provider(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::JetBrains => Box::new(JetBrainsProvider::new()),
         ProviderId::Alibaba => Box::new(AlibabaProvider::new()),
         ProviderId::NanoGPT => Box::new(NanoGPTProvider::new()),
+        ProviderId::Infini => Box::new(InfiniProvider::default()),
     }
 }
 
@@ -2449,7 +2483,9 @@ fn draw_provider_detail_card(
         // ═══════════════════════════════════════════════════════════════════
         // DIVIDER - only if we have metrics
         // ═══════════════════════════════════════════════════════════════════
-        let has_metrics = provider.session_percent.is_some() || provider.weekly_percent.is_some();
+        let has_metrics = provider.session_percent.is_some()
+            || provider.weekly_percent.is_some()
+            || provider.monthly_percent.is_some();
         let has_credits = provider.credits_remaining.is_some();
         let has_cost = provider.cost_used.is_some();
         let has_usage_breakdown = !provider.usage_breakdown.is_empty();
@@ -2502,7 +2538,26 @@ fn draw_provider_detail_card(
                 );
             }
 
-            // Model-specific metric (tertiary) - no pace indicator
+            // Monthly metric (tertiary) - for Infini 30-day quota
+            if let Some(monthly_pct) = provider.monthly_percent {
+                ui.add_space(12.0);
+
+                draw_metric_row(
+                    ui,
+                    MetricRow {
+                        title: locale_text(ui_language, LocaleKey::ProviderMonthly),
+                        percent: monthly_pct,
+                        show_as_used,
+                        reset_text: provider.monthly_reset.as_deref(),
+                        color: brand_color,
+                        pace_percent: None, // No pace for monthly
+                        pace_lasts_to_reset: false,
+                        ui_language,
+                    },
+                );
+            }
+
+            // Model-specific metric
             if let Some(model_pct) = provider.model_percent {
                 ui.add_space(12.0);
 
@@ -3035,6 +3090,8 @@ mod tests {
             session_reset: None,
             weekly_percent: None,
             weekly_reset: None,
+            monthly_percent: None,
+            monthly_reset: None,
             model_percent: None,
             model_name: None,
             plan: None,

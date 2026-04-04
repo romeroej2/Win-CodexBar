@@ -8,7 +8,7 @@ A Windows (and WSL) port of [CodexBar](https://github.com/steipete/CodexBar) —
 
 ## Features
 
-- **15 AI Providers**: Codex, Claude, Cursor, Gemini, Copilot, Antigravity, Windsurf, Zai, Kiro, Vertex AI, Augment, MiniMax, OpenCode, Kimi, Kimi K2
+- **16 AI Providers**: Codex, Claude, Cursor, Gemini, Copilot, Antigravity, Windsurf, Zai, Kiro, Vertex AI, Augment, MiniMax, OpenCode, Kimi, Kimi K2, Infini
 - **System Tray Icon**: Dynamic two-bar meter showing session + weekly usage
 - **Native Windows UI**: Built with egui - no web runtime required
 - **Browser Cookie Extraction**: Automatic extraction from Chrome, Edge, Brave, Firefox (DPAPI encrypted)
@@ -154,6 +154,7 @@ codexbar cost -p claude
 | OpenCode | Local Config | Usage |
 | Kimi | Browser Cookies | 5-Hour Rate, Weekly |
 | Kimi K2 | API Key | Credits |
+| Infini | API Key | Session, Weekly, Quota |
 
 ## First Run
 

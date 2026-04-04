@@ -8,7 +8,7 @@
 
 ## 功能特性
 
-- **15 个 AI 服务商**：Codex、Claude、Cursor、Gemini、Copilot、Antigravity、Windsurf、Zai、Kiro、Vertex AI、Augment、MiniMax、OpenCode、Kimi、Kimi K2
+- **16 个 AI 服务商**：Codex、Claude、Cursor、Gemini、Copilot、Antigravity、Windsurf、Zai、Kiro、Vertex AI、Augment、MiniMax、OpenCode、Kimi、Kimi K2、Infini
 - **系统托盘图标**：动态双条进度显示会话与周用量
 - **原生 Windows UI**：基于 egui 构建，无需 Web 运行时
 - **浏览器 Cookie 提取**：自动从 Chrome、Edge、Brave、Firefox 提取（DPAPI 加密）
@@ -150,6 +150,7 @@ codexbar cost -p claude
 | OpenCode | 本地配置 | 用量 |
 | Kimi | 浏览器 Cookies | 5 小时速率、周用量 |
 | Kimi K2 | API Key | Credits |
+| Infini | API Key | 会话、周用量、配额 |
 
 ## 首次运行
 

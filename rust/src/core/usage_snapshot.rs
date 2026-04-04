@@ -19,6 +19,10 @@ pub struct UsageSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_specific: Option<RateWindow>,
 
+    /// Tertiary rate window (e.g., 30-day quota for Infini)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tertiary: Option<RateWindow>,
+
     /// When this snapshot was captured
     pub updated_at: DateTime<Utc>,
 
@@ -42,6 +46,7 @@ impl UsageSnapshot {
             primary,
             secondary: None,
             model_specific: None,
+            tertiary: None,
             updated_at: Utc::now(),
             account_email: None,
             account_organization: None,
@@ -58,6 +63,12 @@ impl UsageSnapshot {
     /// Builder pattern: set model-specific window
     pub fn with_model_specific(mut self, model_specific: RateWindow) -> Self {
         self.model_specific = Some(model_specific);
+        self
+    }
+
+    /// Builder pattern: set tertiary window
+    pub fn with_tertiary(mut self, tertiary: RateWindow) -> Self {
+        self.tertiary = Some(tertiary);
         self
     }
 
@@ -95,6 +106,12 @@ impl UsageSnapshot {
             most = model_specific;
         }
 
+        if let Some(ref tertiary) = self.tertiary
+            && tertiary.used_percent > most.used_percent
+        {
+            most = tertiary;
+        }
+
         most
     }
 
@@ -106,6 +123,7 @@ impl UsageSnapshot {
                 .model_specific
                 .as_ref()
                 .is_some_and(|w| w.is_exhausted())
+            || self.tertiary.as_ref().is_some_and(|w| w.is_exhausted())
     }
 }
 

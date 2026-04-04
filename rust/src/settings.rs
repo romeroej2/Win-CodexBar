@@ -771,6 +771,15 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             config_file_path: None,
             dashboard_url: Some("https://nano-gpt.com/api"),
         },
+        ProviderConfigInfo {
+            id: ProviderId::Infini,
+            name: "Infini AI",
+            requires_api_key: true,
+            api_key_env_var: Some("INFINI_API_KEY"),
+            api_key_help: Some("Get your API key from Infini Cloud → Settings → API Keys"),
+            config_file_path: None,
+            dashboard_url: Some("https://cloud.infini-ai.com"),
+        },
     ]
 }
 
