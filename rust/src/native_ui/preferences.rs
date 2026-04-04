@@ -3835,8 +3835,8 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
         if setting_toggle(
             ui,
-            "隐藏个人信息",
-            "遮蔽邮箱和账号名称（适合直播时使用）",
+            locale_text(ui_language, LocaleKey::HidePersonalInfo),
+            locale_text(ui_language, LocaleKey::HidePersonalInfoHelper),
             &mut hide_personal_info,
         ) && let Ok(mut state) = shared_state.lock()
         {
@@ -3915,45 +3915,45 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                             });
                     });
             });
-
-            setting_divider(ui);
-
-            let mut auto_download_updates = if let Ok(state) = shared_state.lock() {
-                state.settings.auto_download_updates
-            } else {
-                true
-            };
-
-            if setting_toggle(
-                ui,
-                locale_text(ui_language, LocaleKey::AutoDownloadUpdates),
-                locale_text(ui_language, LocaleKey::AutoDownloadUpdatesHelper),
-                &mut auto_download_updates,
-            ) && let Ok(mut state) = shared_state.lock()
-            {
-                state.settings.auto_download_updates = auto_download_updates;
-                state.settings_changed = true;
-            }
-
-            setting_divider(ui);
-
-            let mut install_updates_on_quit = if let Ok(state) = shared_state.lock() {
-                state.settings.install_updates_on_quit
-            } else {
-                false
-            };
-
-            if setting_toggle(
-                ui,
-                locale_text(ui_language, LocaleKey::InstallUpdatesOnQuit),
-                locale_text(ui_language, LocaleKey::InstallUpdatesOnQuitHelper),
-                &mut install_updates_on_quit,
-            ) && let Ok(mut state) = shared_state.lock()
-            {
-                state.settings.install_updates_on_quit = install_updates_on_quit;
-                state.settings_changed = true;
-            }
         });
+
+        setting_divider(ui);
+
+        let mut auto_download_updates = if let Ok(state) = shared_state.lock() {
+            state.settings.auto_download_updates
+        } else {
+            true
+        };
+
+        if setting_toggle(
+            ui,
+            locale_text(ui_language, LocaleKey::AutoDownloadUpdates),
+            locale_text(ui_language, LocaleKey::AutoDownloadUpdatesHelper),
+            &mut auto_download_updates,
+        ) && let Ok(mut state) = shared_state.lock()
+        {
+            state.settings.auto_download_updates = auto_download_updates;
+            state.settings_changed = true;
+        }
+
+        setting_divider(ui);
+
+        let mut install_updates_on_quit = if let Ok(state) = shared_state.lock() {
+            state.settings.install_updates_on_quit
+        } else {
+            false
+        };
+
+        if setting_toggle(
+            ui,
+            locale_text(ui_language, LocaleKey::InstallUpdatesOnQuit),
+            locale_text(ui_language, LocaleKey::InstallUpdatesOnQuitHelper),
+            &mut install_updates_on_quit,
+        ) && let Ok(mut state) = shared_state.lock()
+        {
+            state.settings.install_updates_on_quit = install_updates_on_quit;
+            state.settings_changed = true;
+        }
     });
 
     ui.add_space(Spacing::LG);
@@ -3964,12 +3964,12 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("全局快捷键")
+                    RichText::new(locale_text(ui_language, LocaleKey::GlobalShortcutLabel))
                         .size(FontSize::MD)
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("按下此快捷键可在任意位置打开 CodexBar")
+                    RichText::new("Press this shortcut to open CodexBar from anywhere")
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
