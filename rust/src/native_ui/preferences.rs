@@ -3958,7 +3958,10 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
     ui.add_space(Spacing::LG);
 
-    section_header(ui, locale_text(ui_language, LocaleKey::KeyboardShortcutsTitle));
+    section_header(
+        ui,
+        locale_text(ui_language, LocaleKey::KeyboardShortcutsTitle),
+    );
 
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
@@ -4024,19 +4027,16 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                                         state.shortcut_input = formatted;
                                         state.settings_changed = true;
                                         state.shortcut_status_msg = Some((
-                                            locale_text(ui_language, LocaleKey::Saved)
-                                                .to_string(),
+                                            locale_text(ui_language, LocaleKey::Saved).to_string(),
                                             false,
                                         ));
                                     }
-                                } else {
-                                    if let Ok(mut state) = shared_state.lock() {
-                                        state.shortcut_status_msg = Some((
-                                            locale_text(ui_language, LocaleKey::InvalidFormat)
-                                                .to_string(),
-                                            true,
-                                        ));
-                                    }
+                                } else if let Ok(mut state) = shared_state.lock() {
+                                    state.shortcut_status_msg = Some((
+                                        locale_text(ui_language, LocaleKey::InvalidFormat)
+                                            .to_string(),
+                                        true,
+                                    ));
                                 }
                             }
                         }

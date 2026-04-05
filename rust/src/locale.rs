@@ -734,9 +734,7 @@ impl LocaleKey {
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "Keyboard Shortcuts",
             LocaleKey::GlobalShortcutLabel => "Global Shortcut",
-            LocaleKey::GlobalShortcutHelper => {
-                "Press this shortcut to open CodexBar from anywhere"
-            }
+            LocaleKey::GlobalShortcutHelper => "Press this shortcut to open CodexBar from anywhere",
             LocaleKey::ShortcutFormatHint => {
                 "Format: Ctrl+Shift+Key, Alt+Ctrl+Key, etc. Restart required to apply changes."
             }
