@@ -3958,7 +3958,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
 
     ui.add_space(Spacing::LG);
 
-    section_header(ui, "Keyboard Shortcuts");
+    section_header(ui, locale_text(ui_language, LocaleKey::KeyboardShortcutsTitle));
 
     settings_card(ui, |ui| {
         ui.horizontal(|ui| {
@@ -3969,7 +3969,7 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                         .color(Theme::TEXT_PRIMARY),
                 );
                 ui.label(
-                    RichText::new("Press this shortcut to open CodexBar from anywhere")
+                    RichText::new(locale_text(ui_language, LocaleKey::GlobalShortcutHelper))
                         .size(FontSize::SM)
                         .color(Theme::TEXT_MUTED),
                 );
@@ -4023,13 +4023,19 @@ fn render_general_tab(ui: &mut egui::Ui, shared_state: &Arc<Mutex<PreferencesSha
                                         state.settings.global_shortcut = formatted.clone();
                                         state.shortcut_input = formatted;
                                         state.settings_changed = true;
-                                        state.shortcut_status_msg =
-                                            Some(("Saved (restart to apply)".to_string(), false));
+                                        state.shortcut_status_msg = Some((
+                                            locale_text(ui_language, LocaleKey::Saved)
+                                                .to_string(),
+                                            false,
+                                        ));
                                     }
                                 } else {
                                     if let Ok(mut state) = shared_state.lock() {
-                                        state.shortcut_status_msg =
-                                            Some(("Invalid shortcut format".to_string(), true));
+                                        state.shortcut_status_msg = Some((
+                                            locale_text(ui_language, LocaleKey::InvalidFormat)
+                                                .to_string(),
+                                            true,
+                                        ));
                                     }
                                 }
                             }

@@ -373,6 +373,7 @@ pub enum LocaleKey {
     // Keyboard shortcuts
     KeyboardShortcutsTitle,
     GlobalShortcutLabel,
+    GlobalShortcutHelper,
     ShortcutFormatHint,
     Saved,
     InvalidFormat,
@@ -733,6 +734,9 @@ impl LocaleKey {
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "Keyboard Shortcuts",
             LocaleKey::GlobalShortcutLabel => "Global Shortcut",
+            LocaleKey::GlobalShortcutHelper => {
+                "Press this shortcut to open CodexBar from anywhere"
+            }
             LocaleKey::ShortcutFormatHint => {
                 "Format: Ctrl+Shift+Key, Alt+Ctrl+Key, etc. Restart required to apply changes."
             }
@@ -1073,6 +1077,7 @@ impl LocaleKey {
             // Keyboard shortcuts
             LocaleKey::KeyboardShortcutsTitle => "快捷键",
             LocaleKey::GlobalShortcutLabel => "全局快捷键",
+            LocaleKey::GlobalShortcutHelper => "按此快捷键可从任意位置打开 CodexBar",
             LocaleKey::ShortcutFormatHint => {
                 "格式：Ctrl+Shift+Key、Alt+Ctrl+Key 等。需重启以应用更改。"
             }
